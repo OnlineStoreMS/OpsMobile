@@ -26,31 +26,42 @@ import {
 import 'vant/lib/index.css'
 import App from './App.vue'
 import router from './router'
+import { ensureSession, redirectToPortal } from './utils/auth'
 import './styles/main.css'
 
-const app = createApp(App)
-;[
-  Button,
-  Cell,
-  CellGroup,
-  Empty,
-  Field,
-  Form,
-  Icon,
-  List,
-  NavBar,
-  NoticeBar,
-  Radio,
-  RadioGroup,
-  Search,
-  Switch,
-  Tag,
-  Toast,
-  Dialog,
-].forEach((c) => app.use(c))
+async function boot() {
+  const ok = await ensureSession()
+  if (!ok) {
+    redirectToPortal()
+    return
+  }
 
-app.config.globalProperties.$toast = showToast
-app.provide('toast', { showToast, showSuccessToast, showFailToast, showLoadingToast, closeToast })
+  const app = createApp(App)
+  ;[
+    Button,
+    Cell,
+    CellGroup,
+    Empty,
+    Field,
+    Form,
+    Icon,
+    List,
+    NavBar,
+    NoticeBar,
+    Radio,
+    RadioGroup,
+    Search,
+    Switch,
+    Tag,
+    Toast,
+    Dialog,
+  ].forEach((c) => app.use(c))
 
-app.use(router)
-app.mount('#app')
+  app.config.globalProperties.$toast = showToast
+  app.provide('toast', { showToast, showSuccessToast, showFailToast, showLoadingToast, closeToast })
+
+  app.use(router)
+  app.mount('#app')
+}
+
+void boot()

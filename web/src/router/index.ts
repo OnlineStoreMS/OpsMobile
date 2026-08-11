@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { ensureSession, redirectToPortal } from '../utils/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -55,13 +54,8 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach(async (to) => {
+router.beforeEach((to) => {
   document.title = String(to.meta.title || '手机端应用中心')
-  const ok = await ensureSession()
-  if (!ok) {
-    redirectToPortal()
-    return false
-  }
   return true
 })
 

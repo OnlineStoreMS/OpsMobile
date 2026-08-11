@@ -1,19 +1,27 @@
 import { getPortalUrl } from './runtimeConfig'
 
-const EXPIRES_KEY = 'uc_expires_at'
-
 let sessionVerified = false
 let refreshPromise: Promise<boolean> | null = null
+let ensurePromise: Promise<boolean> | null = null
 
-export function getExpiresAt(): number | undefined {
-  const raw = localStorage.getItem(EXPIRES_KEY)
-  if (!raw) return undefined
-  const n = Number(raw)
-  return Number.isFinite(n) ? n : undefined
+export function clearToken() {
+  localStorage.removeItem('uc_access_token')
+  localStorage.removeItem('uc_refresh_token')
+  localStorage.removeItem('uc_expires_at')
+  sessionVerified = false
 }
 
-export function saveExpiresAt(expiresAt: number) {
-  localStorage.setItem(EXPIRES_KEY, String(expiresAt))
+export function redirectToPortal() {
+  const back = encodeURIComponent('/apps/ops-m/')
+  window.location.replace(`${getPortalUrl()}/login?redirect=${back}`)
+}
+
+export function iamBase(): string {
+  return import.meta.env.VITE_IAM_API_URL || '/iam'
+}
+
+function saveExpiresAt(expiresAt: number) {
+  localStorage.setItem('uc_expires_at', String(expiresAt))
 }
 
 export function saveAuthTokens(accessToken: string, _refreshToken?: string, expiresAt?: number) {
@@ -33,22 +41,6 @@ function readJwtExp(token: string): number | undefined {
   } catch {
     return undefined
   }
-}
-
-export function clearToken() {
-  localStorage.removeItem('uc_access_token')
-  localStorage.removeItem('uc_refresh_token')
-  localStorage.removeItem(EXPIRES_KEY)
-  sessionVerified = false
-}
-
-export function redirectToPortal() {
-  const back = encodeURIComponent('/apps/ops-m/')
-  window.location.href = `${getPortalUrl()}/login?redirect=${back}`
-}
-
-export function iamBase(): string {
-  return import.meta.env.VITE_IAM_API_URL || '/iam'
 }
 
 export async function tryRefreshAccessToken(): Promise<boolean> {
@@ -81,6 +73,7 @@ export async function fetchSession(): Promise<{
 } | null> {
   try {
     const res = await fetch(`${iamBase()}/auth/me`, { credentials: 'include' })
+    if (!res.ok) return null
     const body = await res.json()
     if (body.code !== 200 || !body.data) return null
     return body.data
@@ -89,27 +82,49 @@ export async function fetchSession(): Promise<{
   }
 }
 
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+/** Cookie SSO：以 /auth/me 为准；登录回跳后可能需短重试 */
 export async function ensureSession(): Promise<boolean> {
-  const exp = getExpiresAt()
-  if (exp && exp * 1000 <= Date.now()) {
-    const refreshed = await tryRefreshAccessToken()
-    if (!refreshed) return false
-  }
   if (sessionVerified) return true
-  const info = await fetchSession()
-  if (info) {
-    sessionVerified = true
-    return true
-  }
-  const refreshed = await tryRefreshAccessToken()
-  if (refreshed) {
-    const again = await fetchSession()
-    if (again) {
+  if (ensurePromise) return ensurePromise
+
+  ensurePromise = (async () => {
+    // 1) 直接读会话（cookie）
+    let info = await fetchSession()
+    if (info) {
       sessionVerified = true
       return true
     }
+
+    // 2) 登录刚 Set-Cookie 后偶发首请求未带上，短等再试
+    await sleep(200)
+    info = await fetchSession()
+    if (info) {
+      sessionVerified = true
+      return true
+    }
+
+    // 3) 用 refresh cookie 续期后再读
+    const refreshed = await tryRefreshAccessToken()
+    if (refreshed) {
+      info = await fetchSession()
+      if (info) {
+        sessionVerified = true
+        return true
+      }
+    }
+
+    return false
+  })()
+
+  try {
+    return await ensurePromise
+  } finally {
+    ensurePromise = null
   }
-  return false
 }
 
 export function trustSession() {
