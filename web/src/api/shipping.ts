@@ -6,6 +6,7 @@ export interface OMSOrder {
   sourceChannel: string
   platform: string
   shopName?: string
+  manualSourceName?: string
   buyerName?: string
   buyerPhone?: string
   shipStatus?: string

@@ -1,32 +1,48 @@
 <template>
   <div class="page">
-    <van-nav-bar title="待发货" left-arrow @click-left="router.back()" />
-    <van-search v-model="keyword" placeholder="订单号/买家/手机" show-action @search="reload">
-      <template #action>
-        <div @click="reload">搜索</div>
-      </template>
-    </van-search>
-    <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
-      <div
-        v-for="row in list"
-        :key="row.id"
-        class="card"
-        style="cursor: pointer"
-        @click="router.push(`/pending/${row.id}`)"
+    <van-nav-bar class="ops-nav" title="待发货" left-arrow @click-left="router.back()" />
+    <div class="list-shell">
+      <van-search
+        v-model="keyword"
+        shape="round"
+        placeholder="订单号 / 买家 / 手机"
+        show-action
+        @search="reload"
       >
-        <div class="list-item-title">
-          {{ row.orderNo }}
-          <van-tag plain type="warning" style="margin-left: 6px">{{ row.shipStatus || '待发货' }}</van-tag>
+        <template #action>
+          <div class="search-action" @click="reload">搜索</div>
+        </template>
+      </van-search>
+      <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
+        <div
+          v-for="(row, idx) in list"
+          :key="row.id"
+          class="order-card"
+          :style="{ animationDelay: `${Math.min(idx, 8) * 0.04}s` }"
+          @click="router.push(`/pending/${row.id}`)"
+        >
+          <div class="order-card__top">
+            <div class="order-card__no">{{ row.orderNo }}</div>
+            <span class="ops-tag ops-tag--warn order-card__tag">
+              {{ labelShipStatus(row.shipStatus) || '待发货' }}
+            </span>
+          </div>
+          <div class="order-card__meta">
+            <div>
+              <strong>{{ row.buyerName || row.address?.name || '-' }}</strong>
+              {{ row.buyerPhone || row.address?.phone || '' }}
+            </div>
+            <div>{{ formatSpecLine(row.items) }}</div>
+            <div>来源 <strong>{{ formatOrderSource(row) }}</strong></div>
+          </div>
+          <div class="order-card__foot">
+            <div class="order-card__time">{{ formatTime(row.orderedAt || row.payTime) }}</div>
+            <van-icon name="arrow" color="#9aabB6" />
+          </div>
         </div>
-        <div class="list-item-meta">
-          <div>{{ row.shopName || row.platform || '-' }} · {{ row.sourceChannel || '-' }}</div>
-          <div>{{ row.buyerName || '-' }} {{ row.buyerPhone || '' }}</div>
-          <div>{{ row.items?.[0]?.productName || '商品' }}{{ (row.items?.length || 0) > 1 ? ` 等${row.items!.length}件` : '' }}</div>
-          <div>{{ formatTime(row.orderedAt || row.payTime) }}</div>
-        </div>
-      </div>
-      <van-empty v-if="!loading && !list.length" description="暂无待发货" />
-    </van-list>
+        <van-empty v-if="!loading && !list.length" description="暂无待发货" />
+      </van-list>
+    </div>
   </div>
 </template>
 
@@ -35,6 +51,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
 import { listPendingOmsOrders, type OMSOrder } from '../api/shipping'
+import { formatOrderSource, formatSpecLine, formatTime, labelShipStatus } from '../utils/labels'
 
 const router = useRouter()
 const keyword = ref('')
@@ -42,11 +59,6 @@ const list = ref<OMSOrder[]>([])
 const loading = ref(false)
 const finished = ref(false)
 const page = ref(1)
-
-function formatTime(v?: string) {
-  if (!v) return '-'
-  return v.replace('T', ' ').slice(0, 19)
-}
 
 async function reload() {
   page.value = 1
@@ -79,3 +91,14 @@ async function loadMore() {
   }
 }
 </script>
+
+<style scoped>
+.order-card {
+  animation: page-in 0.35s ease both;
+}
+.search-action {
+  color: var(--ops-primary);
+  font-weight: 600;
+  padding: 0 4px;
+}
+</style>

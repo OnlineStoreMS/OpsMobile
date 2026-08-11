@@ -1,13 +1,19 @@
 <template>
   <div class="page">
-    <van-nav-bar title="自营订单详情" left-arrow @click-left="router.back()" />
+    <van-nav-bar class="ops-nav" title="自营订单详情" left-arrow @click-left="router.back()" />
     <div class="page-body" v-if="detail">
+      <div class="card detail-hero">
+        <div class="detail-hero__no">{{ detail.refTraceId || detail.soNo }}</div>
+        <div class="detail-hero__tags">
+          <span class="ops-tag">{{ labelSelfStatus(detail.status) }}</span>
+          <span class="ops-tag ops-tag--warn">{{ payLabel(detail.payStatus) }}</span>
+        </div>
+        <div class="detail-hero__price">¥{{ Number(detail.saleAmount || 0).toFixed(2) }}</div>
+      </div>
+
+      <div class="section-label">订单信息</div>
       <div class="card">
-        <div class="list-item-title">{{ detail.soNo }}</div>
-        <div class="detail-row"><span class="label">状态</span><span class="value">{{ detail.status }}</span></div>
-        <div class="detail-row"><span class="label">付款</span><span class="value">{{ detail.payStatus || '-' }}</span></div>
-        <div class="detail-row"><span class="label">OMS单号</span><span class="value">{{ detail.refTraceId || '-' }}</span></div>
-        <div class="detail-row"><span class="label">金额</span><span class="value">¥{{ Number(detail.saleAmount || 0).toFixed(2) }}</span></div>
+        <div class="detail-row"><span class="label">来源</span><span class="value">{{ formatOrderSource(detail) }}</span></div>
         <div class="detail-row"><span class="label">店铺</span><span class="value">{{ detail.shopName || '-' }}</span></div>
         <div class="detail-row"><span class="label">收件人</span><span class="value">{{ detail.buyerName }} {{ detail.buyerPhone }}</span></div>
         <div class="detail-row"><span class="label">地址</span><span class="value">{{ detail.address || '-' }}</span></div>
@@ -15,8 +21,9 @@
         <div class="detail-row"><span class="label">下单</span><span class="value">{{ formatTime(detail.orderedAt || detail.createdAt) }}</span></div>
         <div class="detail-row"><span class="label">发货</span><span class="value">{{ formatTime(detail.shippedAt) }}</span></div>
       </div>
+
+      <div class="section-label">商品</div>
       <div class="card">
-        <div style="font-weight: 600; margin-bottom: 8px">商品</div>
         <div v-for="it in detail.items || []" :key="it.id" class="goods-row">
           <img v-if="it.picUrl" :src="it.picUrl" alt="" />
           <div class="goods-info">
@@ -36,15 +43,19 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, closeToast } from 'vant'
 import { getSelfOrder, type SelfOrderDetail } from '../api/selfOrder'
+import { formatOrderSource, formatTime, labelSelfStatus } from '../utils/labels'
 
 const route = useRoute()
 const router = useRouter()
 const detail = ref<SelfOrderDetail | null>(null)
 const loading = ref(true)
 
-function formatTime(v?: string) {
-  if (!v) return '-'
-  return v.replace('T', ' ').slice(0, 19)
+function payLabel(v?: string) {
+  if (!v) return '未付款'
+  if (v === 'paid') return '已付款'
+  if (v === 'unpaid') return '未付款'
+  if (v === 'partial') return '部分付款'
+  return v
 }
 
 onMounted(async () => {
@@ -60,3 +71,35 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.detail-hero {
+  background: linear-gradient(155deg, #0b1f2a, #163447 60%, #0f766e);
+  color: #fff;
+  border: none;
+}
+.detail-hero__no {
+  font-family: var(--ops-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  word-break: break-all;
+}
+.detail-hero__tags {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.detail-hero__tags .ops-tag {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.detail-hero__price {
+  margin-top: 16px;
+  font-family: var(--ops-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+</style>

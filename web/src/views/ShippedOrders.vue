@@ -1,31 +1,45 @@
 <template>
   <div class="page">
-    <van-nav-bar title="已发货" left-arrow @click-left="router.back()" />
-    <van-search v-model="keyword" placeholder="运单号/收件人/单号" show-action @search="reload">
-      <template #action>
-        <div @click="reload">搜索</div>
-      </template>
-    </van-search>
-    <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
-      <div
-        v-for="row in list"
-        :key="row.id"
-        class="card"
-        style="cursor: pointer"
-        @click="router.push(`/shipped/${row.id}`)"
+    <van-nav-bar class="ops-nav" title="已发货" left-arrow @click-left="router.back()" />
+    <div class="list-shell">
+      <van-search
+        v-model="keyword"
+        shape="round"
+        placeholder="运单号 / 收件人 / 单号"
+        show-action
+        @search="reload"
       >
-        <div class="list-item-title">
-          {{ row.mailNo || row.sourceRef || `#${row.id}` }}
-          <van-tag plain type="success" style="margin-left: 6px">{{ row.status }}</van-tag>
+        <template #action>
+          <div class="search-action" @click="reload">搜索</div>
+        </template>
+      </van-search>
+      <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
+        <div
+          v-for="(row, idx) in list"
+          :key="row.id"
+          class="order-card"
+          :style="{ animationDelay: `${Math.min(idx, 8) * 0.04}s` }"
+          @click="router.push(`/shipped/${row.id}`)"
+        >
+          <div class="order-card__top">
+            <div class="order-card__no">{{ row.mailNo || row.sourceRef || `#${row.id}` }}</div>
+            <span class="ops-tag ops-tag--ok order-card__tag">{{ shipStatusLabel(row.status) }}</span>
+          </div>
+          <div class="order-card__meta">
+            <div>
+              <strong>{{ row.receiverName || '-' }}</strong>
+              {{ row.receiverMobile || '' }}
+            </div>
+            <div>{{ row.cargoName || row.items?.[0]?.goodsName || '-' }}</div>
+          </div>
+          <div class="order-card__foot">
+            <div class="order-card__time">{{ formatTime(row.printedAt || row.createdAt) }}</div>
+            <van-icon name="arrow" color="#9aabB6" />
+          </div>
         </div>
-        <div class="list-item-meta">
-          <div>{{ row.receiverName }} {{ row.receiverMobile }}</div>
-          <div>{{ row.cargoName || row.items?.[0]?.goodsName || '-' }}</div>
-          <div>{{ formatTime(row.printedAt || row.createdAt) }}</div>
-        </div>
-      </div>
-      <van-empty v-if="!loading && !list.length" description="暂无已发货单" />
-    </van-list>
+        <van-empty v-if="!loading && !list.length" description="暂无已发货单" />
+      </van-list>
+    </div>
   </div>
 </template>
 
@@ -34,6 +48,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
 import { listShipments, type Shipment } from '../api/shipping'
+import { formatTime } from '../utils/labels'
 
 const router = useRouter()
 const keyword = ref('')
@@ -42,9 +57,12 @@ const loading = ref(false)
 const finished = ref(false)
 const page = ref(1)
 
-function formatTime(v?: string) {
-  if (!v) return '-'
-  return v.replace('T', ' ').slice(0, 19)
+function shipStatusLabel(v?: string) {
+  if (!v) return '已发货'
+  if (v === 'printed') return '已打单'
+  if (v === 'shipped') return '已发货'
+  if (v === 'pending') return '待发货'
+  return v
 }
 
 async function reload() {
@@ -78,3 +96,14 @@ async function loadMore() {
   }
 }
 </script>
+
+<style scoped>
+.order-card {
+  animation: page-in 0.35s ease both;
+}
+.search-action {
+  color: var(--ops-primary);
+  font-weight: 600;
+  padding: 0 4px;
+}
+</style>

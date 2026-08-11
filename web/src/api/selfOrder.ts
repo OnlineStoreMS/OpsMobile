@@ -9,6 +9,8 @@ export interface SelfOrderListItem {
   payStatus?: string
   buyerName?: string
   buyerPhone?: string
+  sourceChannel?: string
+  platform?: string
   shopName?: string
   skuSpecs?: string
   itemCount: number
@@ -29,6 +31,8 @@ export interface SelfOrderDetail {
   buyerPhone: string
   address: string
   remark: string
+  sourceChannel?: string
+  platform?: string
   shopName?: string
   orderedAt?: string
   shippedAt?: string

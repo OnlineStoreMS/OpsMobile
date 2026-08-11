@@ -6,23 +6,44 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#1a73e8" />
-    <title>手机端应用中心</title>
+    <meta name="theme-color" content="#0b1f2a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>OpsMobile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      .boot-screen {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        background: linear-gradient(160deg, #0b1f2a, #163447);
+        color: rgba(255, 255, 255, 0.72);
+        font-family: 'Sora', 'Noto Sans SC', sans-serif;
+      }
+      .boot-mark {
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: -0.04em;
+        color: #fff;
+      }
+      .boot-text {
+        font-size: 13px;
+      }
+    </style>
   </head>
   <body>
     <div id="app">
-      <div
-        style="
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #8a9199;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          font-size: 14px;
-        "
-      >
-        加载中…
+      <div class="boot-screen">
+        <div class="boot-mark">Ops</div>
+        <div class="boot-text">加载中…</div>
       </div>
     </div>
     <script type="module" src="/src/main.ts"></script>

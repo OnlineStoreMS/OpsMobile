@@ -1,15 +1,19 @@
 <template>
   <div class="page">
-    <van-nav-bar title="新建手工单" left-arrow @click-left="router.back()" />
+    <van-nav-bar class="ops-nav" title="新建手工单" left-arrow @click-left="router.back()" />
 
     <template v-if="!created">
       <div class="page-body">
         <van-notice-bar
+          class="ops-notice"
           left-icon="info-o"
+          background="rgba(15, 118, 110, 0.1)"
+          color="#0f766e"
           text="提交后自动分配自营；请到电脑「发货中心」打单发货。"
         />
 
-        <div class="card" style="margin-top: 12px">
+        <div class="section-label" style="margin-top: 14px">智能填单</div>
+        <div class="card">
           <van-field
             v-model="rawAddress"
             rows="3"
@@ -18,12 +22,23 @@
             label="粘贴地址"
             placeholder="姓名 手机 省市区详细地址"
           />
-          <van-button block type="primary" plain size="small" :loading="parsing" @click="onParse">
+          <van-button block type="primary" plain class="parse-btn" :loading="parsing" @click="onParse">
             智能识别
           </van-button>
         </div>
 
+        <div class="section-label">收件信息</div>
         <div class="card">
+          <van-button
+            block
+            plain
+            type="primary"
+            icon="friends-o"
+            class="pick-recipient-btn"
+            @click="openRecipientPicker"
+          >
+            从客户中心选择
+          </van-button>
           <van-field v-model="form.buyerName" label="收件人" required placeholder="姓名" />
           <van-field v-model="form.buyerPhone" label="手机" required placeholder="手机号" />
           <van-field v-model="form.buyerTel" label="固话" placeholder="可选" />
@@ -39,12 +54,21 @@
             required
             placeholder="街道门牌"
           />
+          <van-cell title="保存到客户中心" center>
+            <template #right-icon>
+              <van-switch v-model="saveCustomer" size="20px" />
+            </template>
+          </van-cell>
+          <div class="muted" style="padding: 0 12px 8px">
+            开启后将收件人写入客户中心，下次可搜索选用
+          </div>
         </div>
 
+        <div class="section-label">商品</div>
         <div class="card">
           <div class="section-head">
-            <span>商品</span>
-            <van-button size="mini" type="primary" plain @click="addLine">加一行</van-button>
+            <span>明细行</span>
+            <van-button size="small" type="primary" plain icon="plus" @click="addLine">加一行</van-button>
           </div>
           <div v-for="(it, idx) in items" :key="idx" class="item-block">
             <van-field
@@ -89,18 +113,16 @@
           </div>
         </div>
 
+        <div class="section-label">其它</div>
         <div class="card">
           <van-field
             v-model="sourceLabel"
             is-link
             readonly
             label="订单来源"
-            :placeholder="sourcesLoading ? '加载中…' : sources.length ? '请选择' : '暂无来源，点此重试'"
+            :placeholder="sourcesLoading ? '加载中…' : '请选择或新建'"
             @click="openSourcePicker"
           />
-          <div v-if="!sourcesLoading && !sources.length" class="muted" style="padding: 0 12px 8px">
-            请在电脑 OrderCore「设置 → 手工订单来源」中先录入
-          </div>
           <van-field
             v-model="form.remark"
             rows="2"
@@ -113,7 +135,7 @@
       </div>
 
       <div class="action-bar">
-        <van-button type="primary" block :loading="submitting" @click="submit">提交</van-button>
+        <van-button type="primary" block round :loading="submitting" @click="submit">提交订单</van-button>
       </div>
     </template>
 
@@ -136,18 +158,99 @@
       close-on-click-action
       @select="onSourceSelect"
     />
+
+    <van-dialog
+      v-model:show="showCreateSource"
+      title="新建订单来源"
+      show-cancel-button
+      :confirm-button-loading="creatingSource"
+      :before-close="beforeCreateSourceClose"
+    >
+      <div style="padding: 12px 16px 8px">
+        <van-field
+          v-model="newSourceName"
+          autofocus
+          maxlength="64"
+          placeholder="名称，如：微信私域 / 线下门店"
+        />
+      </div>
+    </van-dialog>
+
+    <van-popup
+      v-model:show="showRecipientPicker"
+      position="bottom"
+      round
+      safe-area-inset-bottom
+      :style="{ height: '88%' }"
+      @opened="onRecipientPopupOpened"
+    >
+      <div class="recipient-panel">
+        <div class="recipient-header">
+          <button type="button" class="recipient-close" @click="showRecipientPicker = false">关闭</button>
+          <div class="recipient-title">选择收件人</div>
+          <span class="recipient-close placeholder" />
+        </div>
+        <van-search
+          ref="recipientSearchRef"
+          v-model="recipientKeyword"
+          shape="round"
+          clearable
+          placeholder="输入姓名、手机或地址，自动搜索"
+          @update:model-value="onRecipientKeywordChange"
+          @search="runRecipientSearch"
+          @clear="runRecipientSearch"
+        />
+        <div class="recipient-hint muted">点选即可填入收件信息</div>
+        <div class="recipient-list">
+          <van-list
+            v-model:loading="recipientLoadingMore"
+            :finished="recipientFinished"
+            :finished-text="recipientList.length ? '没有更多了' : ''"
+            @load="loadMoreRecipients"
+          >
+            <div
+              v-for="row in recipientList"
+              :key="`${row.customerId}-${row.addressId}`"
+              class="recipient-item"
+              @click="applyRecipient(row)"
+            >
+              <div class="recipient-avatar">{{ recipientInitial(row) }}</div>
+              <div class="recipient-body">
+                <div class="recipient-name">
+                  <span>{{ row.contactName || row.displayName || '未命名' }}</span>
+                  <span class="recipient-phone">{{ row.phone || row.primaryPhone || '' }}</span>
+                </div>
+                <div class="recipient-addr">{{ formatRecipientAddress(row) || '暂无地址' }}</div>
+              </div>
+              <van-icon name="arrow" class="recipient-arrow" />
+            </div>
+          </van-list>
+          <div v-if="recipientSearching && !recipientList.length" class="recipient-state">
+            <van-loading size="24px">搜索中…</van-loading>
+          </div>
+          <van-empty
+            v-else-if="!recipientSearching && !recipientList.length"
+            image="search"
+            description="未找到收件人，换个关键词试试"
+          />
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, showSuccessToast, closeToast } from 'vant'
 import {
   createManualOrder,
+  createManualOrderSource,
   listManualOrderSources,
   parseManualAddress,
+  searchManualRecipients,
   type ManualOrderSource,
+  type RecipientSearchItem,
 } from '../api/manualOrder'
 
 interface LineItem {
@@ -161,10 +264,29 @@ const rawAddress = ref('')
 const parsing = ref(false)
 const submitting = ref(false)
 const showSourcePicker = ref(false)
+const showCreateSource = ref(false)
+const creatingSource = ref(false)
+const newSourceName = ref('')
 const sources = ref<ManualOrderSource[]>([])
 const sourcesLoading = ref(false)
 const manualSourceId = ref<number | undefined>()
 const sourceLabel = ref('')
+const saveCustomer = ref(true)
+
+const showRecipientPicker = ref(false)
+const recipientKeyword = ref('')
+const recipientSearching = ref(false)
+const recipientLoadingMore = ref(false)
+const recipientFinished = ref(true)
+const recipientBootstrapped = ref(false)
+const recipientList = ref<RecipientSearchItem[]>([])
+const recipientTotal = ref(0)
+const recipientPage = ref(1)
+const recipientSearchRef = ref<{ focus?: () => void } | null>(null)
+let recipientSearchTimer: ReturnType<typeof setTimeout> | null = null
+let recipientReqSeq = 0
+
+const CREATE_SOURCE_ID = -1
 
 const form = reactive({
   buyerName: '',
@@ -180,9 +302,10 @@ const form = reactive({
 const items = ref<LineItem[]>([emptyLine()])
 const created = ref<{ orderNo: string; tip: string } | null>(null)
 
-const sourceActions = computed(() =>
-  sources.value.map((s) => ({ name: s.name, id: s.id })),
-)
+const sourceActions = computed(() => [
+  { name: '＋ 新建来源', id: CREATE_SOURCE_ID, color: '#1a73e8' },
+  ...sources.value.map((s) => ({ name: s.name, id: s.id })),
+])
 
 const orderTotal = computed(() =>
   items.value.reduce((sum, it) => sum + lineTotal(it), 0),
@@ -203,17 +326,45 @@ function addLine() {
 }
 
 function onSourceSelect(action: { name: string; id: number }) {
+  if (action.id === CREATE_SOURCE_ID) {
+    newSourceName.value = ''
+    showCreateSource.value = true
+    return
+  }
   manualSourceId.value = action.id
   sourceLabel.value = action.name
 }
 
-async function openSourcePicker() {
-  if (!sources.value.length && !sourcesLoading.value) {
-    await loadSources()
+async function beforeCreateSourceClose(action: string) {
+  if (action !== 'confirm') return true
+  const name = newSourceName.value.trim()
+  if (!name) {
+    showFailToast('请输入来源名称')
+    return false
   }
-  if (!sources.value.length) {
-    showFailToast('暂无订单来源，请先在电脑 OrderCore 配置')
-    return
+  creatingSource.value = true
+  try {
+    const row = await createManualOrderSource({ name, enabled: true })
+    sources.value = [
+      { id: row.id, name: row.name, code: row.code, enabled: row.enabled },
+      ...sources.value.filter((s) => s.id !== row.id),
+    ]
+    manualSourceId.value = row.id
+    sourceLabel.value = row.name
+    newSourceName.value = ''
+    showSuccessToast('已新建并选中')
+    return true
+  } catch (e: any) {
+    showFailToast(e?.message || '新建失败')
+    return false
+  } finally {
+    creatingSource.value = false
+  }
+}
+
+async function openSourcePicker() {
+  if (!sourcesLoading.value) {
+    await loadSources()
   }
   showSourcePicker.value = true
 }
@@ -254,6 +405,97 @@ async function onParse() {
   }
 }
 
+function formatRecipientAddress(row: RecipientSearchItem) {
+  return `${row.province || ''}${row.city || ''}${row.district || ''}${row.detail || ''}`
+}
+
+function recipientInitial(row: RecipientSearchItem) {
+  const name = (row.contactName || row.displayName || '客').trim()
+  return name.slice(0, 1)
+}
+
+function openRecipientPicker() {
+  showRecipientPicker.value = true
+  recipientKeyword.value = form.buyerPhone || form.buyerName || ''
+  recipientBootstrapped.value = false
+  recipientFinished.value = true
+  recipientPage.value = 1
+  void runRecipientSearch()
+}
+
+function onRecipientPopupOpened() {
+  nextTick(() => {
+    const el = document.querySelector('.recipient-panel .van-field__control') as HTMLInputElement | null
+    el?.focus?.()
+  })
+}
+
+function onRecipientKeywordChange() {
+  if (recipientSearchTimer) clearTimeout(recipientSearchTimer)
+  recipientSearchTimer = setTimeout(() => {
+    runRecipientSearch()
+  }, 320)
+}
+
+async function runRecipientSearch() {
+  recipientPage.value = 1
+  recipientBootstrapped.value = false
+  recipientFinished.value = true
+  await searchRecipients(true)
+  recipientBootstrapped.value = true
+}
+
+async function searchRecipients(reset: boolean) {
+  const seq = ++recipientReqSeq
+  if (reset) {
+    recipientSearching.value = true
+  } else {
+    recipientLoadingMore.value = true
+  }
+  try {
+    const data = await searchManualRecipients(recipientKeyword.value.trim(), recipientPage.value, 20)
+    if (seq !== recipientReqSeq) return
+    const list = data?.list || []
+    if (reset || recipientPage.value <= 1) {
+      recipientList.value = list
+    } else {
+      recipientList.value = [...recipientList.value, ...list]
+    }
+    recipientTotal.value = data?.total || 0
+    recipientFinished.value =
+      recipientList.value.length >= recipientTotal.value || list.length < 20
+  } catch (e: any) {
+    if (seq !== recipientReqSeq) return
+    recipientFinished.value = true
+    showFailToast(e.message || '搜索失败')
+  } finally {
+    if (seq === recipientReqSeq) {
+      recipientSearching.value = false
+      recipientLoadingMore.value = false
+    }
+  }
+}
+
+async function loadMoreRecipients() {
+  if (!recipientBootstrapped.value || recipientFinished.value || recipientSearching.value) {
+    recipientLoadingMore.value = false
+    return
+  }
+  recipientPage.value += 1
+  await searchRecipients(false)
+}
+
+function applyRecipient(row: RecipientSearchItem) {
+  form.buyerName = row.contactName || row.displayName || ''
+  form.buyerPhone = row.phone || row.primaryPhone || ''
+  form.province = row.province || ''
+  form.city = row.city || ''
+  form.district = row.district || ''
+  form.detail = row.detail || ''
+  showRecipientPicker.value = false
+  showSuccessToast('已填入收件人')
+}
+
 async function submit() {
   if (!form.buyerName || (!form.buyerPhone && !form.buyerTel)) {
     showFailToast('请填写收件人与手机/固话')
@@ -290,6 +532,7 @@ async function submit() {
       buyerPhone: form.buyerPhone,
       buyerTel: form.buyerTel,
       remark: form.remark,
+      saveCustomer: saveCustomer.value,
       syncKdzs: true,
       createAction: 'create_and_push',
       manualSourceId: manualSourceId.value || undefined,
@@ -332,9 +575,14 @@ function resetForm() {
   form.remark = ''
   manualSourceId.value = undefined
   sourceLabel.value = ''
+  saveCustomer.value = true
 }
 
 onMounted(loadSources)
+
+onUnmounted(() => {
+  if (recipientSearchTimer) clearTimeout(recipientSearchTimer)
+})
 </script>
 
 <style scoped>
@@ -342,12 +590,24 @@ onMounted(loadSources)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-weight: 650;
+  margin-bottom: 8px;
+  color: var(--ops-ink-soft);
+}
+.parse-btn {
+  margin-top: 8px;
+  height: 40px;
+  border-radius: 12px;
+}
+.pick-recipient-btn {
+  margin: 0 0 10px;
+  height: 42px;
+  border-radius: 12px;
+  border-style: dashed;
 }
 .item-block {
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f2f5;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ops-line);
 }
 .item-block:last-of-type {
   border-bottom: none;
@@ -371,11 +631,119 @@ onMounted(loadSources)
   justify-content: space-between;
   padding: 12px 4px 4px;
   font-size: 15px;
-  border-top: 1px solid #f0f2f5;
+  border-top: 1px solid var(--ops-line);
   margin-top: 4px;
 }
 .total-row strong {
-  color: #e11d48;
-  font-size: 18px;
+  color: var(--ops-danger);
+  font-family: var(--ops-display);
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+.recipient-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--ops-bg);
+}
+.recipient-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 4px;
+  background: rgba(255, 255, 255, 0.92);
+}
+.recipient-title {
+  font-family: var(--ops-display);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.recipient-close {
+  border: 0;
+  background: transparent;
+  color: var(--ops-primary);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 8px;
+  min-width: 48px;
+}
+.recipient-close.placeholder {
+  visibility: hidden;
+}
+.recipient-hint {
+  padding: 0 16px 8px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+}
+.recipient-list {
+  flex: 1;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 12px 16px;
+}
+.recipient-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 12px;
+  margin-bottom: 8px;
+  background: var(--ops-card-solid);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: var(--ops-shadow-sm);
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.recipient-item:active {
+  background: #e8f6f3;
+  transform: scale(0.985);
+}
+.recipient-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ops-display);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.recipient-body {
+  flex: 1;
+  min-width: 0;
+}
+.recipient-name {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 15px;
+  font-weight: 650;
+  margin-bottom: 4px;
+}
+.recipient-phone {
+  color: var(--ops-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+.recipient-addr {
+  color: var(--ops-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.recipient-arrow {
+  color: #c8c9cc;
+  flex-shrink: 0;
+}
+.recipient-state {
+  padding: 40px 0;
+  text-align: center;
 }
 </style>

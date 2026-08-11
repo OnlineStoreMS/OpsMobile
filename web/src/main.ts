@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import {
+  ActionSheet,
   Button,
   Cell,
   CellGroup,
@@ -8,8 +9,10 @@ import {
   Form,
   Icon,
   List,
+  Loading,
   NavBar,
   NoticeBar,
+  Popup,
   Radio,
   RadioGroup,
   Search,
@@ -38,6 +41,7 @@ async function boot() {
 
   const app = createApp(App)
   ;[
+    ActionSheet,
     Button,
     Cell,
     CellGroup,
@@ -46,8 +50,10 @@ async function boot() {
     Form,
     Icon,
     List,
+    Loading,
     NavBar,
     NoticeBar,
+    Popup,
     Radio,
     RadioGroup,
     Search,
