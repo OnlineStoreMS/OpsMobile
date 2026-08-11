@@ -14,26 +14,25 @@ export interface ParsedAddress {
   shipContent?: string
 }
 
+export interface ManualOrderSource {
+  id: number
+  name: string
+  code?: string
+  enabled?: boolean
+}
+
 export async function parseManualAddress(rawAddress: string) {
   return unwrap<ParsedAddress>(
     await orderClient.post('/orders/manual/parse-address', { rawAddress, batch: false }),
   )
 }
 
-export async function searchPIMProducts(keyword: string, page = 1, pageSize = 20) {
-  return unwrap<{
-    list: Array<{
-      productId?: number
-      productName?: string
-      skuId?: number
-      skuCode?: string
-      specLabel?: string
-      specs?: Record<string, string> | string
-      price?: number
-      pic?: string
-    }>
-    total: number
-  }>(await orderClient.get('/orders/manual/products/pim', { params: { keyword, page, pageSize } }))
+export async function listManualOrderSources() {
+  return unwrap<ManualOrderSource[]>(
+    await orderClient.get('/manual-order-sources', {
+      params: { enabledOnly: '1' },
+    }),
+  )
 }
 
 export async function createManualOrder(body: Record<string, unknown>) {

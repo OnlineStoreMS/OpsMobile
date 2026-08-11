@@ -130,3 +130,19 @@ export async function ensureSession(): Promise<boolean> {
 export function trustSession() {
   sessionVerified = true
 }
+
+/** 清除 Cookie SSO 会话并跳转登录页 */
+export async function logout() {
+  try {
+    await fetch(`${iamBase()}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+  } catch {
+    // ignore network errors; still clear local state
+  }
+  clearToken()
+  redirectToPortal()
+}
