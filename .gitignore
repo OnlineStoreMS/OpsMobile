@@ -1,0 +1,21 @@
+# Go / build artifacts (none for OpsMobile web-only)
+bin/
+*.exe
+*.out
+.tmp/
+.build/
+
+web/node_modules/
+web/dist/
+
+.cursor/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+.env
+.env.*
+!.env.example
+
+*.log
