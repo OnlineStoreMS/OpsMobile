@@ -1,14 +1,18 @@
-/** 自营单状态 */
-const selfOrderStatusLabels: Record<string, string> = {
+/** 自营单据状态（发货进度单独展示） */
+const selfDocStatusLabels: Record<string, string> = {
   draft: '草稿',
   ordered: '已下单',
   confirmed: '已下单',
   paid: '已付款',
-  partial_shipped: '部分发货',
-  shipped: '已发货',
   completed: '已完成',
   cancelled: '已取消',
+}
+
+/** 自营发货状态 */
+const selfShipStatusLabels: Record<string, string> = {
   wait_ship: '待发货',
+  partial_shipped: '部分发货',
+  shipped: '已发货',
 }
 
 /** OMS 履约状态 */
@@ -20,12 +24,14 @@ const omsStatusLabels: Record<string, string> = {
   purchasing: '采购中',
   shipped: '已发货',
   partial_ship: '部分发货',
+  partial_shipped: '部分发货',
   completed: '已完成',
   closed: '已关闭',
 }
 
 const shipStatusLabels: Record<string, string> = {
   wait_ship: '待发货',
+  partial_shipped: '部分发货',
   shipped: '已发货',
 }
 
@@ -46,9 +52,45 @@ const platformLabels: Record<string, string> = {
   MANUAL: '手工单',
 }
 
+/** 单据状态：部分发货/已发货仍属已付款阶段 */
+export function deriveSelfDocStatus(status?: string): string {
+  const s = (status || '').trim()
+  if (s === 'partial_shipped' || s === 'shipped') return 'paid'
+  if (s === 'confirmed') return 'ordered'
+  return s
+}
+
+export function deriveSelfShipStatus(status?: string): string {
+  switch ((status || '').trim()) {
+    case 'partial_shipped':
+      return 'partial_shipped'
+    case 'shipped':
+    case 'completed':
+      return 'shipped'
+    case 'ordered':
+    case 'paid':
+    case 'confirmed':
+      return 'wait_ship'
+    default:
+      return ''
+  }
+}
+
+export function labelSelfDocStatus(v?: string) {
+  const doc = deriveSelfDocStatus(v)
+  if (!doc) return '-'
+  return selfDocStatusLabels[doc] || selfDocStatusLabels[v || ''] || v || '-'
+}
+
+export function labelSelfShipStatus(v?: string) {
+  const ship = deriveSelfShipStatus(v)
+  if (!ship) return ''
+  return selfShipStatusLabels[ship] || ship
+}
+
+/** @deprecated 兼容旧调用：优先展示发货进度，否则单据状态 */
 export function labelSelfStatus(v?: string) {
-  if (!v) return '-'
-  return selfOrderStatusLabels[v] || v
+  return labelSelfShipStatus(v) || labelSelfDocStatus(v)
 }
 
 export function labelOmsStatus(v?: string) {

@@ -39,7 +39,14 @@
         >
           <div class="order-card__top">
             <div class="order-card__no">{{ orderNo(row) }}</div>
-            <span class="ops-tag order-card__tag">{{ labelSelfStatus(row.status) }}</span>
+            <div class="order-card__tags">
+              <span class="ops-tag order-card__tag">{{ labelSelfDocStatus(row.status) }}</span>
+              <span
+                v-if="labelSelfShipStatus(row.status)"
+                class="ops-tag order-card__tag"
+                :class="shipTagClass(row.status)"
+              >{{ labelSelfShipStatus(row.status) }}</span>
+            </div>
           </div>
           <div class="receiver-line">
             <van-icon name="contact" />
@@ -72,16 +79,16 @@ import {
   type SelfOrderListItem,
   type SelfOrderStatusCounts,
 } from '../api/selfOrder'
-import { formatOrderSource, labelSelfStatus } from '../utils/labels'
+import { formatOrderSource, labelSelfDocStatus, labelSelfShipStatus, deriveSelfShipStatus } from '../utils/labels'
 import { toApiDateTimeRange, todayDay } from '../utils/dateRange'
 
 type StatusTabKey =
   | 'all'
   | 'wait_ship'
+  | 'shipped'
+  | 'partial_shipped'
   | 'unpaid'
   | 'paid'
-  | 'partial_shipped'
-  | 'shipped'
   | 'completed'
   | 'cancelled'
   | 'draft'
@@ -105,13 +112,14 @@ const page = ref(1)
 const statusTabs = computed(() => {
   const by = counts.value.byStatus || {}
   const n = (k: string) => Number(by[k] || 0)
+  // 发货态：全部之后按 待发货 → 已发货 → 部分发货（对齐电脑端发货筛选语义）
   return [
     { key: 'all' as const, label: '全部', count: Number(counts.value.all || 0) },
     { key: 'wait_ship' as const, label: '待发货', count: Number(counts.value.waitShip || 0) },
-    { key: 'unpaid' as const, label: '待付款', count: Number(counts.value.unpaid || 0) },
-    { key: 'paid' as const, label: '已付款', count: n('paid') },
+    { key: 'shipped' as const, label: '已发货', count: n('shipped') + n('completed') },
     { key: 'partial_shipped' as const, label: '部分发货', count: n('partial_shipped') },
-    { key: 'shipped' as const, label: '已发货', count: n('shipped') },
+    { key: 'unpaid' as const, label: '待付款', count: Number(counts.value.unpaid || 0) },
+    { key: 'paid' as const, label: '已付款', count: n('paid') + n('partial_shipped') + n('shipped') },
     { key: 'completed' as const, label: '已完成', count: n('completed') },
     { key: 'cancelled' as const, label: '已取消', count: n('cancelled') },
     { key: 'draft' as const, label: '草稿', count: n('draft') },
@@ -120,6 +128,13 @@ const statusTabs = computed(() => {
 
 function orderNo(row: SelfOrderListItem) {
   return (row.refTraceId || '').trim() || row.soNo || '-'
+}
+
+function shipTagClass(status?: string) {
+  const ship = deriveSelfShipStatus(status)
+  if (ship === 'shipped') return 'ops-tag--ok'
+  if (ship === 'partial_shipped' || ship === 'wait_ship') return 'ops-tag--warn'
+  return ''
 }
 
 function listParams() {
@@ -135,18 +150,19 @@ function listParams() {
     case 'wait_ship':
       base.shipStatus = 'wait_ship'
       break
+    case 'shipped':
+      base.shipStatus = 'shipped'
+      break
+    case 'partial_shipped':
+      base.shipStatus = 'partial_shipped'
+      break
     case 'unpaid':
       base.payStatus = 'unpaid,partial'
       base.excludeStatuses = 'draft,cancelled'
       break
     case 'paid':
+      // 电脑端「已付款」含部分发货/已发货
       base.status = 'paid'
-      break
-    case 'partial_shipped':
-      base.status = 'partial_shipped'
-      break
-    case 'shipped':
-      base.status = 'shipped'
       break
     case 'completed':
       base.status = 'completed'
@@ -228,6 +244,13 @@ onMounted(() => {
 <style scoped>
 .order-card {
   animation: page-in 0.35s ease both;
+}
+.order-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+  max-width: 58%;
 }
 .search-action {
   color: var(--ops-primary);

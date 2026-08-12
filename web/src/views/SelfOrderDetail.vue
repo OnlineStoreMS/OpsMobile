@@ -5,7 +5,12 @@
       <div class="card detail-hero">
         <div class="detail-hero__no">{{ detail.refTraceId || detail.soNo }}</div>
         <div class="detail-hero__tags">
-          <span class="ops-tag">{{ labelSelfStatus(detail.status) }}</span>
+          <span class="ops-tag">{{ labelSelfDocStatus(detail.status) }}</span>
+          <span
+            v-if="labelSelfShipStatus(detail.status)"
+            class="ops-tag"
+            :class="shipTagClass(detail.status)"
+          >{{ labelSelfShipStatus(detail.status) }}</span>
           <span class="ops-tag ops-tag--warn">{{ payLabel(detail.payStatus) }}</span>
         </div>
         <div class="detail-hero__price">¥{{ Number(detail.saleAmount || 0).toFixed(2) }}</div>
@@ -43,7 +48,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, closeToast } from 'vant'
 import { getSelfOrder, type SelfOrderDetail } from '../api/selfOrder'
-import { formatOrderSource, formatTime, labelSelfStatus } from '../utils/labels'
+import { formatOrderSource, formatTime, labelSelfDocStatus, labelSelfShipStatus, deriveSelfShipStatus } from '../utils/labels'
 
 const route = useRoute()
 const router = useRouter()
@@ -56,6 +61,13 @@ function payLabel(v?: string) {
   if (v === 'unpaid') return '未付款'
   if (v === 'partial') return '部分付款'
   return v
+}
+
+function shipTagClass(status?: string) {
+  const ship = deriveSelfShipStatus(status)
+  if (ship === 'shipped') return 'ops-tag--ok'
+  if (ship === 'partial_shipped' || ship === 'wait_ship') return 'ops-tag--warn'
+  return ''
 }
 
 onMounted(async () => {
