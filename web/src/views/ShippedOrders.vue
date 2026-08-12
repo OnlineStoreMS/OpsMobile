@@ -13,6 +13,7 @@
           <div class="search-action" @click="reload">搜索</div>
         </template>
       </van-search>
+      <DateRangeBar :start="rangeStart" :end="rangeEnd" @change="onRangeChange" />
       <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
         <div
           v-for="(row, idx) in list"
@@ -31,6 +32,7 @@
               {{ row.receiverMobile || '' }}
             </div>
             <div>{{ row.cargoName || row.items?.[0]?.goodsName || '-' }}</div>
+            <div>来源 <strong>{{ formatOrderSource(row) }}</strong></div>
           </div>
           <div class="order-card__foot">
             <div class="order-card__time">{{ formatTime(row.printedAt || row.createdAt) }}</div>
@@ -47,11 +49,15 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
+import DateRangeBar from '../components/DateRangeBar.vue'
 import { listShipments, type Shipment } from '../api/shipping'
-import { formatTime } from '../utils/labels'
+import { formatOrderSource, formatTime } from '../utils/labels'
+import { toApiDateTimeRange, todayDay } from '../utils/dateRange'
 
 const router = useRouter()
 const keyword = ref('')
+const rangeStart = ref(todayDay())
+const rangeEnd = ref(todayDay())
 const list = ref<Shipment[]>([])
 const loading = ref(false)
 const finished = ref(false)
@@ -65,6 +71,12 @@ function shipStatusLabel(v?: string) {
   return v
 }
 
+function onRangeChange(payload: { start: string; end: string }) {
+  rangeStart.value = payload.start
+  rangeEnd.value = payload.end
+  void reload()
+}
+
 async function reload() {
   page.value = 1
   finished.value = false
@@ -75,9 +87,12 @@ async function reload() {
 async function loadMore() {
   loading.value = true
   try {
+    const { start, end } = toApiDateTimeRange(rangeStart.value, rangeEnd.value)
     const res = await listShipments({
       keyword: keyword.value.trim() || undefined,
       status: 'printed',
+      printedAtStart: start,
+      printedAtEnd: end,
       page: page.value,
       pageSize: 20,
     })

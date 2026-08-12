@@ -1,8 +1,8 @@
 /** 自营单状态 */
 const selfOrderStatusLabels: Record<string, string> = {
   draft: '草稿',
-  ordered: '待发货',
-  confirmed: '待发货',
+  ordered: '已下单',
+  confirmed: '已下单',
   paid: '已付款',
   partial_shipped: '部分发货',
   shipped: '已发货',
@@ -79,17 +79,20 @@ export function formatOrderSource(row: {
   shopName?: string
 }) {
   const channel = (row.sourceChannel || '').trim()
-  if (channel === 'manual') {
-    return (row.manualSourceName || '').trim() || '手工订单'
+  const plat = (row.platform || '').trim().toUpperCase()
+  const isManual =
+    channel === 'manual' || plat === 'DFHAND' || plat === 'MANUAL' || plat === 'HAND'
+  if (isManual) {
+    return (row.manualSourceName || row.shopName || '').trim() || '手工订单'
   }
   const src = labelSource(channel)
-  const plat = labelPlatform((row.platform || '').trim())
+  const platLabel = labelPlatform(plat)
   const shop = (row.shopName || '').trim()
   if (src !== '-' && shop) return `${src} · ${shop}`
-  if (src !== '-' && plat !== '-') return `${src} · ${plat}`
+  if (src !== '-' && platLabel !== '-') return `${src} · ${platLabel}`
   if (src !== '-') return src
   if (shop) return shop
-  if (plat !== '-') return plat
+  if (platLabel !== '-') return platLabel
   return '-'
 }
 

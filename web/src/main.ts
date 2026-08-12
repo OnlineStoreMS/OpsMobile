@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import {
   ActionSheet,
   Button,
+  Calendar,
   Cell,
   CellGroup,
   Empty,
@@ -43,6 +44,7 @@ async function boot() {
   ;[
     ActionSheet,
     Button,
+    Calendar,
     Cell,
     CellGroup,
     Empty,

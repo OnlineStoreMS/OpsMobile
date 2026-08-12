@@ -12,6 +12,7 @@ export interface SelfOrderListItem {
   sourceChannel?: string
   platform?: string
   shopName?: string
+  manualSourceName?: string
   skuSpecs?: string
   itemCount: number
   orderedAt?: string
@@ -34,6 +35,7 @@ export interface SelfOrderDetail {
   sourceChannel?: string
   platform?: string
   shopName?: string
+  manualSourceName?: string
   orderedAt?: string
   shippedAt?: string
   createdAt: string
@@ -52,10 +54,31 @@ export interface SelfOrderDetail {
 export async function listSelfOrders(params: {
   keyword?: string
   status?: string
+  statuses?: string
+  excludeStatuses?: string
+  payStatus?: string
+  shipStatus?: string
+  orderedAtStart?: string
+  orderedAtEnd?: string
   page?: number
   pageSize?: number
 }) {
   return unwrap<PageData<SelfOrderListItem>>(await selfClient.get('/self-orders', { params }))
+}
+
+export interface SelfOrderStatusCounts {
+  all: number
+  byStatus: Record<string, number>
+  waitShip: number
+  unpaid: number
+}
+
+export async function getSelfOrderStatusCounts(params: {
+  keyword?: string
+  orderedAtStart?: string
+  orderedAtEnd?: string
+}) {
+  return unwrap<SelfOrderStatusCounts>(await selfClient.get('/self-orders/status-counts', { params }))
 }
 
 export async function getSelfOrder(id: number) {

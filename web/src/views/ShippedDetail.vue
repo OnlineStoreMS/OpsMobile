@@ -16,6 +16,7 @@
       <div class="card">
         <div class="detail-row"><span class="label">运单号</span><span class="value">{{ detail.mailNo || '-' }}</span></div>
         <div class="detail-row"><span class="label">来源单</span><span class="value">{{ detail.sourceRef || '-' }}</span></div>
+        <div class="detail-row"><span class="label">订单来源</span><span class="value">{{ formatOrderSource(detail) }}</span></div>
         <div class="detail-row"><span class="label">平台</span><span class="value">{{ detail.platform || '-' }}</span></div>
         <div class="detail-row"><span class="label">地址</span><span class="value">{{ addrText }}</span></div>
         <div class="detail-row"><span class="label">货物</span><span class="value">{{ detail.cargoName || '-' }}</span></div>
@@ -41,7 +42,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, closeToast } from 'vant'
 import { getShipment, type Shipment } from '../api/shipping'
-import { formatTime } from '../utils/labels'
+import { formatOrderSource, formatTime } from '../utils/labels'
 
 const route = useRoute()
 const router = useRouter()

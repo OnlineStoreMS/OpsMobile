@@ -8,9 +8,28 @@
           <span class="ops-tag">{{ labelOmsStatus(detail.status) }}</span>
           <span class="ops-tag ops-tag--warn">{{ labelShipStatus(detail.shipStatus) }}</span>
         </div>
-        <div class="detail-hero__sub">
-          {{ detail.buyerName || detail.address?.name || '-' }}
-          {{ detail.buyerPhone || detail.address?.phone || '' }}
+        <div class="detail-hero__price" v-if="detail.totalAmount != null || detail.payAmount != null">
+          ¥{{ Number(detail.payAmount ?? detail.totalAmount ?? 0).toFixed(2) }}
+        </div>
+      </div>
+
+      <div class="section-label">收件人信息</div>
+      <div class="card">
+        <div class="detail-row">
+          <span class="label">姓名</span>
+          <span class="value">{{ detail.buyerName || detail.address?.name || '-' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">电话</span>
+          <span class="value">{{ detail.buyerPhone || detail.address?.phone || '-' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">省市区</span>
+          <span class="value">{{ regionText }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">详细地址</span>
+          <span class="value">{{ detail.address?.address || detail.address?.fullText || '-' }}</span>
         </div>
       </div>
 
@@ -18,17 +37,26 @@
       <div class="card">
         <div class="detail-row"><span class="label">来源</span><span class="value">{{ formatOrderSource(detail) }}</span></div>
         <div class="detail-row"><span class="label">店铺</span><span class="value">{{ detail.shopName || '-' }}</span></div>
-        <div class="detail-row"><span class="label">地址</span><span class="value">{{ addrText }}</span></div>
+        <div class="detail-row"><span class="label">自营单</span><span class="value">{{ detail.selfOrderNo || '-' }}</span></div>
         <div class="detail-row"><span class="label">下单</span><span class="value">{{ formatTime(detail.orderedAt || detail.payTime) }}</span></div>
+        <div class="detail-row"><span class="label">备注</span><span class="value">{{ detail.remark || detail.sellerRemark || '-' }}</span></div>
+        <div class="detail-row" v-if="detail.shipContent">
+          <span class="label">发货内容</span>
+          <span class="value">{{ detail.shipContent }}</span>
+        </div>
       </div>
 
-      <div class="section-label">商品</div>
+      <div class="section-label">商品明细</div>
       <div class="card">
         <div v-for="(it, idx) in detail.items || []" :key="idx" class="goods-row">
           <img v-if="it.picUrl" :src="it.picUrl" alt="" />
           <div class="goods-info">
-            <div class="goods-name">{{ it.productName || it.skuSpecs || '商品' }}</div>
-            <div class="muted">{{ it.skuSpecs || '' }} · ×{{ it.quantity || 1 }}</div>
+            <div class="goods-name">{{ it.skuSpecs || it.productName || '商品' }}</div>
+            <div class="muted">
+              ×{{ it.quantity || 1 }}
+              <template v-if="it.price != null"> · ¥{{ Number(it.price).toFixed(2) }}</template>
+              <template v-if="it.totalAmount != null"> · 小计 ¥{{ Number(it.totalAmount).toFixed(2) }}</template>
+            </div>
           </div>
         </div>
         <div v-if="!detail.items?.length" class="muted">无商品行</div>
@@ -47,7 +75,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, closeToast } from 'vant'
-import { listPendingOmsOrders, type OMSOrder } from '../api/shipping'
+import { getOmsOrder, listPendingOmsOrders, type OMSOrder } from '../api/shipping'
 import { formatOrderSource, formatTime, labelOmsStatus, labelShipStatus } from '../utils/labels'
 
 const route = useRoute()
@@ -55,18 +83,31 @@ const router = useRouter()
 const detail = ref<OMSOrder | null>(null)
 const loading = ref(true)
 
-const addrText = computed(() => {
+const regionText = computed(() => {
   const a = detail.value?.address
   if (!a) return '-'
-  return a.fullText || [a.province, a.city, a.district, a.address].filter(Boolean).join(' ') || '-'
+  const t = [a.province, a.city, a.district].filter(Boolean).join(' ')
+  return t || '-'
 })
 
-onMounted(async () => {
+async function loadDetail() {
   const id = Number(route.params.id)
+  if (!id) return null
+  try {
+    return await getOmsOrder(id)
+  } catch {
+    // 兜底：按订单号从待发货列表找
+    const no = typeof route.query.no === 'string' ? route.query.no : ''
+    const keyword = no || String(id)
+    const res = await listPendingOmsOrders({ keyword, shipStatus: 'wait_ship', page: 1, pageSize: 50 })
+    return (res.list || []).find((o) => o.id === id) || (res.list || []).find((o) => o.orderNo === no) || null
+  }
+}
+
+onMounted(async () => {
   showLoadingToast({ message: '加载中…', forbidClick: true, duration: 0 })
   try {
-    const res = await listPendingOmsOrders({ keyword: String(id), page: 1, pageSize: 20 })
-    detail.value = (res.list || []).find((o) => o.id === id) || res.list?.[0] || null
+    detail.value = await loadDetail()
   } catch (e: any) {
     showFailToast(e.message || '加载失败')
   } finally {
@@ -100,10 +141,12 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
 }
-.detail-hero__sub {
+.detail-hero__price {
   margin-top: 14px;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.82);
+  font-family: var(--ops-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 .tip-card {
   display: flex;

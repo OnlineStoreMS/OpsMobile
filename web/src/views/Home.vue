@@ -3,20 +3,15 @@
     <header class="home-hero">
       <div class="home-hero__glow" />
       <div class="home-hero__top">
-        <div>
-          <div class="home-brand">OpsMobile</div>
-          <div class="home-greet">{{ greet }}</div>
+        <div class="home-session" v-if="userLabel">
+          <span class="home-session__user">{{ displayName }}</span>
+          <span class="home-session__dot" v-if="tenantName">·</span>
+          <span class="home-session__tenant" v-if="tenantName">{{ tenantName }}</span>
         </div>
         <button type="button" class="home-logout" @click="onLogout">退出</button>
       </div>
-      <div class="home-user" v-if="userLabel">
-        <div class="home-avatar">{{ userInitial }}</div>
-        <div class="home-user__meta">
-          <div class="home-user__name">{{ displayName }}</div>
-          <div class="home-user__tenant">{{ tenantName }}</div>
-        </div>
-      </div>
-      <p class="home-lead">轻量履约助手 · 建单、查单、跟发货</p>
+      <div class="home-brand">OpsMobile</div>
+      <div class="home-greet">{{ greet }} · 轻量履约助手</div>
     </header>
 
     <div class="page-body home-body">
@@ -62,7 +57,6 @@ const loggingOut = ref(false)
 const userLabel = computed(() =>
   displayName.value ? `${displayName.value} · ${tenantName.value}` : '',
 )
-const userInitial = computed(() => (displayName.value || 'O').slice(0, 1))
 
 const greet = computed(() => {
   const h = new Date().getHours()
@@ -144,94 +138,91 @@ onMounted(async () => {
   position: relative;
   overflow: hidden;
   margin: 0 0 4px;
-  padding: calc(18px + env(safe-area-inset-top)) 18px 22px;
+  padding: calc(12px + env(safe-area-inset-top)) 16px 16px;
   background: linear-gradient(155deg, #0b1f2a 0%, #163447 55%, #0f766e 140%);
   color: #fff;
-  border-radius: 0 0 28px 28px;
-  box-shadow: 0 18px 40px rgba(11, 31, 42, 0.28);
+  border-radius: 0 0 24px 24px;
+  box-shadow: 0 14px 32px rgba(11, 31, 42, 0.22);
 }
 .home-hero__glow {
   position: absolute;
-  width: 220px;
-  height: 220px;
-  right: -60px;
-  top: -70px;
+  width: 180px;
+  height: 180px;
+  right: -50px;
+  top: -60px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.35), transparent 68%);
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.3), transparent 68%);
   pointer-events: none;
 }
 .home-hero__top {
   position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
+  min-height: 28px;
 }
-.home-brand {
-  font-family: var(--ops-display);
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1.05;
+.home-session {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.62);
+  overflow: hidden;
 }
-.home-greet {
-  margin-top: 6px;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.68);
+.home-session__user {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.home-session__dot {
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+.home-session__tenant {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .home-logout {
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  color: rgba(255, 255, 255, 0.9);
   border-radius: 999px;
-  padding: 7px 12px;
-  font-size: 13px;
+  padding: 4px 10px;
+  font-size: 11px;
+  line-height: 1.2;
   backdrop-filter: blur(8px);
 }
 .home-logout:active {
   background: rgba(255, 255, 255, 0.16);
 }
-.home-user {
+.home-brand {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 18px;
-  padding: 12px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-.home-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  margin-top: 10px;
   font-family: var(--ops-display);
+  font-size: 26px;
   font-weight: 700;
-  background: linear-gradient(145deg, #f59e0b, #d97706);
-  color: #fff;
-  flex-shrink: 0;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
 }
-.home-user__name {
-  font-size: 15px;
-  font-weight: 650;
-}
-.home-user__tenant {
-  margin-top: 2px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.62);
-}
-.home-lead {
+.home-greet {
   position: relative;
-  margin: 14px 0 0;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.66);
 }
 .home-body {
-  margin-top: -6px;
+  margin-top: -4px;
 }
 .home-tip {
   display: flex;
