@@ -59,6 +59,7 @@
           </div>
           <div class="order-card__foot">
             <div class="order-card__price">¥{{ Number(row.saleAmount || 0).toFixed(2) }}</div>
+            <div class="order-card__time">{{ formatTime(row.createdAt || row.orderedAt) }}</div>
             <van-icon name="arrow" color="#9aabB6" />
           </div>
         </div>
@@ -79,7 +80,7 @@ import {
   type SelfOrderListItem,
   type SelfOrderStatusCounts,
 } from '../api/selfOrder'
-import { formatOrderSource, labelSelfDocStatus, labelSelfShipStatus, deriveSelfShipStatus } from '../utils/labels'
+import { formatOrderSource, formatTime, labelSelfDocStatus, labelSelfShipStatus, deriveSelfShipStatus } from '../utils/labels'
 import { toApiDateTimeRange, todayDay } from '../utils/dateRange'
 
 type StatusTabKey =
@@ -135,6 +136,16 @@ function shipTagClass(status?: string) {
   if (ship === 'shipped') return 'ops-tag--ok'
   if (ship === 'partial_shipped' || ship === 'wait_ship') return 'ops-tag--warn'
   return ''
+}
+
+/** 最新创建在前（对齐电脑端 created_at DESC） */
+function sortNewestFirst(rows: SelfOrderListItem[]) {
+  return [...rows].sort((a, b) => {
+    const ta = Date.parse(a.createdAt || a.orderedAt || '') || 0
+    const tb = Date.parse(b.createdAt || b.orderedAt || '') || 0
+    if (tb !== ta) return tb - ta
+    return (b.id || 0) - (a.id || 0)
+  })
 }
 
 function listParams() {
@@ -222,7 +233,7 @@ async function loadMore() {
   try {
     const res = await listSelfOrders(listParams())
     const rows = res.list || []
-    list.value.push(...rows)
+    list.value = sortNewestFirst(list.value.concat(rows))
     if (list.value.length >= (res.total || 0) || rows.length < 20) {
       finished.value = true
     } else {
@@ -251,6 +262,17 @@ onMounted(() => {
   gap: 6px;
   justify-content: flex-end;
   max-width: 58%;
+}
+.order-card__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.order-card__time {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ops-muted);
+  font-variant-numeric: tabular-nums;
 }
 .search-action {
   color: var(--ops-primary);
