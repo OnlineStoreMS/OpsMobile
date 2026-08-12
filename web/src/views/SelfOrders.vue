@@ -13,8 +13,11 @@
           <div class="search-action" @click="reload">搜索</div>
         </template>
       </van-search>
-      <div class="range-hint">创建时间</div>
-      <DateRangeBar :start="rangeStart" :end="rangeEnd" @change="onRangeChange" />
+      <template v-if="showDateFilter">
+        <div class="range-hint">创建时间</div>
+        <DateRangeBar :start="rangeStart" :end="rangeEnd" @change="onRangeChange" />
+      </template>
+      <div v-else class="range-hint range-hint--plain">待发货：全部未发完单据（含部分发货）</div>
 
       <div class="status-bar">
         <button
@@ -92,7 +95,7 @@ import {
   labelSelfPayStatus,
   deriveSelfShipStatus,
 } from '../utils/labels'
-import { daysAgo, toApiDateTimeRange, todayDay } from '../utils/dateRange'
+import { toApiDateTimeRange, todayDay } from '../utils/dateRange'
 
 type StatusTabKey =
   | 'all'
@@ -108,8 +111,8 @@ type StatusTabKey =
 
 const router = useRouter()
 const keyword = ref('')
-/** 默认近 7 天创建时间，对齐电脑端 */
-const rangeStart = ref(daysAgo(6))
+/** 默认今天（创建时间） */
+const rangeStart = ref(todayDay())
 const rangeEnd = ref(todayDay())
 const activeTab = ref<StatusTabKey>('all')
 const counts = ref<SelfOrderStatusCounts>({
@@ -123,6 +126,9 @@ const loading = ref(false)
 const finished = ref(false)
 const page = ref(1)
 
+/** 待发货不看日期，拉全部未发完 */
+const showDateFilter = computed(() => activeTab.value !== 'wait_ship')
+
 const statusTabs = computed(() => {
   const by = counts.value.byStatus || {}
   const n = (k: string) => Number(by[k] || 0)
@@ -133,8 +139,8 @@ const statusTabs = computed(() => {
   return [
     { key: 'all' as const, label: '全部', count: all },
     { key: 'wait_ship' as const, label: '待发货', count: Number(counts.value.waitShip || 0) },
-    { key: 'shipped' as const, label: '已发货', count: n('shipped') + completed },
     { key: 'partial_shipped' as const, label: '部分发货', count: n('partial_shipped') },
+    { key: 'shipped' as const, label: '已发货', count: n('shipped') + completed },
     { key: 'pay_unpaid' as const, label: '未付款', count: Number(counts.value.unpaid || 0) },
     { key: 'pay_partial' as const, label: '部分付款', count: null as number | null },
     { key: 'pay_paid' as const, label: '已付清', count: null as number | null },
@@ -173,13 +179,16 @@ function sortNewestFirst(rows: SelfOrderListItem[]) {
 }
 
 function listParams() {
-  const { start, end } = toApiDateTimeRange(rangeStart.value, rangeEnd.value)
   const base: Parameters<typeof listSelfOrders>[0] = {
     keyword: keyword.value.trim() || undefined,
-    createdAtStart: start,
-    createdAtEnd: end,
     page: page.value,
     pageSize: 20,
+  }
+  // 待发货：不限创建时间，含部分发货
+  if (activeTab.value !== 'wait_ship') {
+    const { start, end } = toApiDateTimeRange(rangeStart.value, rangeEnd.value)
+    base.createdAtStart = start
+    base.createdAtEnd = end
   }
   switch (activeTab.value) {
     case 'wait_ship':
@@ -232,16 +241,21 @@ function onTabChange(key: StatusTabKey) {
 
 async function refreshCounts() {
   try {
+    const kw = keyword.value.trim() || undefined
     const { start, end } = toApiDateTimeRange(rangeStart.value, rangeEnd.value)
-    const data = await getSelfOrderStatusCounts({
-      keyword: keyword.value.trim() || undefined,
-      createdAtStart: start,
-      createdAtEnd: end,
-    })
+    // 带日期：全部/付款等 Tab 数量；待发货数量单独不限日期
+    const [data, waitAll] = await Promise.all([
+      getSelfOrderStatusCounts({
+        keyword: kw,
+        createdAtStart: start,
+        createdAtEnd: end,
+      }),
+      getSelfOrderStatusCounts({ keyword: kw }),
+    ])
     counts.value = {
       all: Number(data?.all || 0),
       byStatus: data?.byStatus || {},
-      waitShip: Number(data?.waitShip || 0),
+      waitShip: Number(waitAll?.waitShip || 0),
       unpaid: Number(data?.unpaid || 0),
     }
   } catch {
@@ -307,6 +321,9 @@ onMounted(() => {
   font-size: 12px;
   color: var(--ops-muted);
   font-weight: 600;
+}
+.range-hint--plain {
+  padding-bottom: 10px;
 }
 .search-action {
   color: var(--ops-primary);

@@ -14,13 +14,16 @@
       type="button"
       class="date-chip date-chip--custom"
       :class="{ 'date-chip--on': preset === 'custom' }"
-      @click="showCal = true"
+      @click="openCalendar"
     >
       {{ customLabel }}
     </button>
 
+    <!-- key：每次打开重建，避免 default-date 只生效一次导致自定义异常 -->
     <van-calendar
-      v-model:show="showCal"
+      v-if="showCal"
+      :key="calendarKey"
+      :show="showCal"
       type="range"
       :min-date="minDate"
       :max-date="maxDate"
@@ -28,6 +31,8 @@
       allow-same-day
       :show-confirm="true"
       confirm-text="确定"
+      teleport="body"
+      @update:show="onShowUpdate"
       @confirm="onConfirm"
     />
   </div>
@@ -37,7 +42,7 @@
 import { computed, ref, watch } from 'vue'
 import { daysAgo, formatDay, parseDay, todayDay } from '../utils/dateRange'
 
-export type DatePreset = 'today' | '7d' | '30d' | 'custom'
+export type DatePreset = 'today' | 'yesterday' | '7d' | '30d' | 'custom'
 
 const props = defineProps<{
   start: string
@@ -50,16 +55,42 @@ const emit = defineEmits<{
 
 const presets: Array<{ key: Exclude<DatePreset, 'custom'>; label: string }> = [
   { key: 'today', label: '今天' },
+  { key: 'yesterday', label: '昨天' },
   { key: '7d', label: '近7天' },
   { key: '30d', label: '近30天' },
 ]
 
 const showCal = ref(false)
+const calendarKey = ref(0)
 const preset = ref<DatePreset>('today')
 const minDate = new Date(new Date().getFullYear() - 2, 0, 1)
-const maxDate = new Date()
+/** 含当天全天，避免只到 00:00 导致选今天异常 */
+const maxDate = computed(() => {
+  const d = new Date()
+  d.setHours(23, 59, 59, 999)
+  return d
+})
 
-const calendarDefault = computed(() => [parseDay(props.start), parseDay(props.end)] as [Date, Date])
+function clampDay(day: string): Date {
+  const d = parseDay(day)
+  if (Number.isNaN(d.getTime())) return parseDay(todayDay())
+  const today = parseDay(todayDay())
+  if (d > today) return today
+  if (d < minDate) return new Date(minDate)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+const calendarDefault = computed(() => {
+  let a = clampDay(props.start)
+  let b = clampDay(props.end)
+  if (a.getTime() > b.getTime()) {
+    const t = a
+    a = b
+    b = t
+  }
+  return [a, b] as [Date, Date]
+})
 
 const customLabel = computed(() => {
   if (preset.value !== 'custom') return '自定义'
@@ -69,7 +100,9 @@ const customLabel = computed(() => {
 
 function detectPreset(start: string, end: string): DatePreset {
   const today = todayDay()
+  const yday = daysAgo(1)
   if (start === today && end === today) return 'today'
+  if (start === yday && end === yday) return 'yesterday'
   if (start === daysAgo(6) && end === today) return '7d'
   if (start === daysAgo(29) && end === today) return '30d'
   return 'custom'
@@ -84,12 +117,28 @@ watch(
 )
 
 function applyPreset(key: Exclude<DatePreset, 'custom'>) {
-  const end = todayDay()
-  let start = end
-  if (key === '7d') start = daysAgo(6)
-  if (key === '30d') start = daysAgo(29)
+  const today = todayDay()
+  let start = today
+  let end = today
+  if (key === 'yesterday') {
+    start = daysAgo(1)
+    end = start
+  } else if (key === '7d') {
+    start = daysAgo(6)
+  } else if (key === '30d') {
+    start = daysAgo(29)
+  }
   preset.value = key
   emit('change', { start, end, preset: key })
+}
+
+function openCalendar() {
+  calendarKey.value += 1
+  showCal.value = true
+}
+
+function onShowUpdate(v: boolean) {
+  showCal.value = v
 }
 
 function onConfirm(dates: Date | Date[]) {
