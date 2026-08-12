@@ -51,6 +51,24 @@ const router = createRouter({
       component: () => import('../views/ShippedDetail.vue'),
       meta: { title: '已发货详情' },
     },
+    {
+      path: '/ship/:orderId',
+      name: 'ShipOrder',
+      component: () => import('../views/ShipOrder.vue'),
+      meta: { title: '打单发货' },
+    },
+    {
+      path: '/sf-order',
+      name: 'SFOrderPrint',
+      component: () => import('../views/SFOrderPrint.vue'),
+      meta: { title: '顺丰标准寄件' },
+    },
+    {
+      path: '/printers',
+      name: 'PrinterSettings',
+      component: () => import('../views/PrinterSettings.vue'),
+      meta: { title: '打印机管理' },
+    },
   ],
 })
 

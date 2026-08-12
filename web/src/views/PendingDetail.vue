@@ -62,9 +62,8 @@
         <div v-if="!detail.items?.length" class="muted">无商品行</div>
       </div>
 
-      <div class="card tip-card">
-        <van-icon name="printer" color="#0f766e" />
-        <div class="muted">打单请在电脑「发货中心」操作</div>
+      <div class="footer-safe" v-if="canShip">
+        <van-button type="primary" block round @click="goShip">打单发货</van-button>
       </div>
     </div>
     <van-empty v-else-if="!loading" description="未找到订单" />
@@ -89,6 +88,19 @@ const regionText = computed(() => {
   const t = [a.province, a.city, a.district].filter(Boolean).join(' ')
   return t || '-'
 })
+
+const canShip = computed(() => {
+  const s = (detail.value?.shipStatus || '').toLowerCase()
+  return !s || s === 'wait_ship' || s === 'partial_shipped' || s.includes('wait')
+})
+
+function goShip() {
+  if (!detail.value) return
+  router.push({
+    path: `/ship/${detail.value.id}`,
+    query: detail.value.orderNo ? { no: detail.value.orderNo } : undefined,
+  })
+}
 
 async function loadDetail() {
   const id = Number(route.params.id)
@@ -148,9 +160,10 @@ onMounted(async () => {
   font-weight: 700;
   letter-spacing: -0.03em;
 }
-.tip-card {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.footer-safe {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 0 calc(12px + var(--ops-safe-bottom));
+  background: linear-gradient(180deg, transparent, var(--ops-bg) 30%);
 }
 </style>

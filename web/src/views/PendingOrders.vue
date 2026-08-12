@@ -44,7 +44,14 @@
           </div>
           <div class="order-card__foot">
             <div class="order-card__time">{{ formatTime(row.orderedAt || row.payTime) }}</div>
-            <div class="order-card__more">查看详情 <van-icon name="arrow" /></div>
+            <van-button
+              size="mini"
+              type="primary"
+              round
+              @click.stop="openShip(row)"
+            >
+              打单发货
+            </van-button>
           </div>
         </div>
         <van-empty v-if="!loading && !list.length" description="暂无待发货" />
@@ -88,6 +95,13 @@ function receiverAddr(row: OMSOrder) {
 function openDetail(row: OMSOrder) {
   router.push({
     path: `/pending/${row.id}`,
+    query: row.orderNo ? { no: row.orderNo } : undefined,
+  })
+}
+
+function openShip(row: OMSOrder) {
+  router.push({
+    path: `/ship/${row.id}`,
     query: row.orderNo ? { no: row.orderNo } : undefined,
   })
 }

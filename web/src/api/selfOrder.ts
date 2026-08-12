@@ -4,6 +4,7 @@ export interface SelfOrderListItem {
   id: number
   soNo: string
   status: string
+  refSoId?: number
   refTraceId: string
   saleAmount: number
   payStatus?: string

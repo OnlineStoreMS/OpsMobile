@@ -38,13 +38,17 @@
         </div>
         <div v-if="!detail.items?.length" class="muted">无商品行</div>
       </div>
+
+      <div class="footer-safe" v-if="canShip">
+        <van-button type="primary" block round @click="goShip">打单发货</van-button>
+      </div>
     </div>
     <van-empty v-else-if="!loading" description="未找到订单" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, closeToast } from 'vant'
 import { getSelfOrder, type SelfOrderDetail } from '../api/selfOrder'
@@ -74,6 +78,20 @@ function payTagClass(pay?: string) {
   if (s === 'paid') return 'ops-tag--ok'
   if (s === 'partial') return 'ops-tag--warn'
   return ''
+}
+
+const canShip = computed(() => {
+  if (!detail.value?.refSoId) return false
+  const ship = deriveSelfShipStatus(detail.value.status)
+  return ship === 'wait_ship' || ship === 'partial_shipped'
+})
+
+function goShip() {
+  if (!detail.value?.refSoId) return
+  router.push({
+    path: `/ship/${detail.value.refSoId}`,
+    query: detail.value.refTraceId ? { no: detail.value.refTraceId } : undefined,
+  })
 }
 
 onMounted(async () => {
@@ -119,5 +137,11 @@ onMounted(async () => {
   font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.03em;
+}
+.footer-safe {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 0 calc(12px + var(--ops-safe-bottom));
+  background: linear-gradient(180deg, transparent, var(--ops-bg) 30%);
 }
 </style>

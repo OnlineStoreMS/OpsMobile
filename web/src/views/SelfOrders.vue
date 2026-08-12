@@ -67,7 +67,16 @@
           <div class="order-card__foot">
             <div class="order-card__price">¥{{ Number(row.saleAmount || 0).toFixed(2) }}</div>
             <div class="order-card__time">{{ formatTime(row.createdAt || row.orderedAt) }}</div>
-            <van-icon name="arrow" color="#9aabB6" />
+            <van-button
+              v-if="showShipBtn(row)"
+              size="mini"
+              type="primary"
+              round
+              @click.stop="openShip(row)"
+            >
+              打单发货
+            </van-button>
+            <van-icon v-else name="arrow" color="#9aabB6" />
           </div>
         </div>
         <van-empty v-if="!loading && !list.length" description="暂无自营订单" />
@@ -166,6 +175,20 @@ function payTagClass(pay?: string) {
   if (s === 'paid') return 'ops-tag--ok'
   if (s === 'partial') return 'ops-tag--warn'
   return ''
+}
+
+function showShipBtn(row: SelfOrderListItem) {
+  if (!(row.refSoId && row.refSoId > 0)) return false
+  const ship = deriveSelfShipStatus(row.status)
+  return ship === 'wait_ship' || ship === 'partial_shipped'
+}
+
+function openShip(row: SelfOrderListItem) {
+  if (!row.refSoId) return
+  router.push({
+    path: `/ship/${row.refSoId}`,
+    query: row.refTraceId ? { no: row.refTraceId } : undefined,
+  })
 }
 
 /** 最新创建在前（对齐电脑端 created_at DESC） */

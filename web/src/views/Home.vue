@@ -35,8 +35,8 @@
       <div class="home-tip card">
         <van-icon name="info-o" color="#0f766e" />
         <div>
-          <div class="home-tip__title">手机建单后</div>
-          <div class="muted">请到电脑「发货中心」完成打单发货</div>
+          <div class="home-tip__title">手机打单发货</div>
+          <div class="muted">待发货可直达打单；请先配置局域网 C-Lodop 打印机</div>
         </div>
       </div>
     </div>
@@ -98,6 +98,14 @@ const apps = [
     icon: 'passed',
     gradient: 'linear-gradient(145deg, #047857, #10b981)',
     glow: 'rgba(16, 185, 129, 0.26)',
+  },
+  {
+    path: '/printers',
+    title: '打印机管理',
+    desc: 'C-Lodop 局域网配置',
+    icon: 'printer',
+    gradient: 'linear-gradient(145deg, #4338ca, #6366f1)',
+    glow: 'rgba(99, 102, 241, 0.26)',
   },
 ]
 
