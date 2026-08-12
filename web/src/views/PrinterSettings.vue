@@ -10,15 +10,25 @@
       <div class="section-label">C-Lodop 云打印服务</div>
       <div class="card">
         <div class="muted tip">
-          在局域网 Windows 电脑安装并启动 C-Lodop，手机与该电脑同网后填写下方地址，即可查询打印机并打单。
+          手机打开的是 HTTPS 站点，浏览器会拦截直连
+          <code>http://局域网:8000</code>（混合内容）。
+          因此通过网站同域代理访问 C-Lodop；下方填写打印电脑地址供服务器转发。
+        </div>
+        <div v-if="secure" class="proxy-box">
+          <div class="proxy-box__label">当前加载方式</div>
+          <code class="proxy-box__url">{{ proxyBase }}</code>
         </div>
         <van-field
           v-model="hostInput"
-          label="服务地址"
-          placeholder="192.168.3.10:8000"
+          label="打印电脑"
+          placeholder="192.168.3.20:8000"
           clearable
           :border="false"
         />
+        <div class="muted tip tip--sm">
+          仅需填写局域网 IP（服务器会反代到该地址）。改 IP 后请联系运维同步
+          <code>CLODOP_HTTP_UPSTREAM</code>，或保持默认 192.168.3.20:8000。
+        </div>
         <div class="btn-row">
           <van-button size="small" type="primary" :loading="saving" @click="saveHost">保存并探测</van-button>
           <van-button size="small" plain hairline @click="clearHost">清除</van-button>
@@ -27,7 +37,7 @@
           <van-icon :name="serviceOk ? 'passed' : 'close'" />
           <div>
             <div class="status-title">{{ serviceOk ? '服务已连通' : '服务未连通' }}</div>
-            <div class="muted">{{ serviceOk ? serviceEndpoint || '已加载 CLodopfuncs.js' : serviceError || '请先配置并保存' }}</div>
+            <div class="muted">{{ serviceOk ? serviceEndpoint || '已加载 CLodopfuncs.js' : serviceError || '请先探测' }}</div>
           </div>
         </div>
         <a class="dl-link" href="http://www.lodop.net/download.html" target="_blank" rel="noopener">官网下载 C-Lodop</a>
@@ -69,16 +79,19 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast } from 'vant'
 import {
   ensureLocalPrintService,
+  getClodopProxyBase,
   getClodopServiceBase,
   getSavedPrinterIndex,
   getSavedPrinterName,
+  isSecureAppContext,
   listLocalPrinters,
   normalizeClodopServiceBase,
+  resolveClodopLoadBase,
   saveClodopServiceBase,
   savePrinterSelection,
   testPrintLocalPrinter,
@@ -86,7 +99,7 @@ import {
 } from '../utils/sfPrintPlugin'
 
 const router = useRouter()
-const hostInput = ref(getClodopServiceBase().replace(/^https?:\/\//i, '') || '')
+const hostInput = ref(getClodopServiceBase().replace(/^https?:\/\//i, '') || '192.168.3.20:8000')
 const saving = ref(false)
 const loading = ref(false)
 const testing = ref(false)
@@ -96,6 +109,8 @@ const serviceEndpoint = ref('')
 const printers = ref<LocalPrinter[]>([])
 const selected = ref<number | null>(getSavedPrinterIndex())
 const savedName = ref(getSavedPrinterName())
+const secure = computed(() => isSecureAppContext())
+const proxyBase = computed(() => getClodopProxyBase())
 
 async function probeService() {
   serviceError.value = ''
@@ -103,7 +118,7 @@ async function probeService() {
   try {
     await ensureLocalPrintService()
     serviceOk.value = true
-    serviceEndpoint.value = getClodopServiceBase() || 'localhost'
+    serviceEndpoint.value = resolveClodopLoadBase()
   } catch (e) {
     serviceOk.value = false
     serviceError.value = (e as Error).message || '未连通'
@@ -113,6 +128,12 @@ async function probeService() {
 async function refresh() {
   loading.value = true
   try {
+    // 换地址后清掉旧脚本缓存标记，强制重载
+    document.querySelectorAll('script[data-sf-print]').forEach((el) => el.remove())
+    ;(window as any).getCLodop = undefined
+    ;(window as any).LODOP = undefined
+    ;(window as any).CLODOP = undefined
+
     await probeService()
     if (!serviceOk.value) {
       printers.value = []
@@ -142,11 +163,6 @@ async function saveHost() {
     const normalized = normalizeClodopServiceBase(hostInput.value)
     saveClodopServiceBase(normalized)
     hostInput.value = normalized.replace(/^https?:\/\//i, '')
-    // 换主机后需重新加载脚本：刷新页面最稳妥；此处先清掉可能的旧 LODOP 引用再探测
-    ;(window as any).getCLodop = undefined
-    ;(window as any).LODOP = undefined
-    ;(window as any).CLODOP = undefined
-    document.querySelectorAll('script[data-sf-print]').forEach((el) => el.remove())
     await refresh()
     if (serviceOk.value) showSuccessToast('已连通')
     else showFailToast(serviceError.value || '未连通')
@@ -188,7 +204,12 @@ async function runTest() {
   }
 }
 
-onMounted(refresh)
+onMounted(() => {
+  if (!getClodopServiceBase() && hostInput.value) {
+    saveClodopServiceBase(normalizeClodopServiceBase(hostInput.value))
+  }
+  void refresh()
+})
 </script>
 
 <style scoped>
@@ -201,6 +222,27 @@ onMounted(refresh)
   margin-bottom: 8px;
   line-height: 1.5;
   font-size: 13px;
+}
+.tip--sm {
+  font-size: 12px;
+  margin-top: 4px;
+}
+.tip code,
+.proxy-box__url {
+  font-size: 12px;
+  word-break: break-all;
+}
+.proxy-box {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--ops-primary-soft);
+}
+.proxy-box__label {
+  font-size: 12px;
+  color: var(--ops-primary);
+  font-weight: 600;
+  margin-bottom: 4px;
 }
 .btn-row {
   display: flex;

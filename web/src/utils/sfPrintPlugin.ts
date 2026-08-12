@@ -53,7 +53,86 @@ export function normalizeClodopServiceBase(input: string): string {
   }
 }
 
+/**
+ * 同域反代地址（HTTPS 站点专用）。
+ * 浏览器禁止 https 页面加载 http://局域网:8000 脚本（混合内容），
+ * 因此经 Caddy `/apps/ops-m/clodop/` 转到 C-Lodop。
+ */
+export function getClodopProxyBase(): string {
+  const appBase = (import.meta.env.BASE_URL || '/apps/ops-m/').replace(/\/?$/, '/')
+  if (typeof window === 'undefined') return `${appBase}clodop`
+  return `${window.location.origin}${appBase}clodop`
+}
+
+export function isSecureAppContext(): boolean {
+  return typeof window !== 'undefined' && window.location.protocol === 'https:'
+}
+
+/** 当前应优先使用的 C-Lodop 根地址（HTTPS 下强制走同域反代） */
+export function resolveClodopLoadBase(): string {
+  if (isSecureAppContext()) return getClodopProxyBase()
+  return getClodopServiceBase() || getClodopProxyBase()
+}
+
+function patchLodopHostURI(LODOP: LodopInstance, base: string) {
+  const uri = base.replace(/\/+$/, '')
+  try {
+    LODOP.strHostURI = uri
+  } catch {
+    /* ignore */
+  }
+  // 部分版本挂在全局 CLODOP
+  try {
+    if (window.CLODOP && typeof window.CLODOP === 'object') {
+      ;(window.CLODOP as LodopInstance).strHostURI = uri
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * CLodopfuncs.js 生成时写死了 `new WebSocket('ws://192.168.x.x:8000/c_webskt/')`，
+ * HTTPS 页无法直连 ws://局域网。在加载脚本前劫持 WebSocket，改走同域 wss 反代。
+ */
+let wsShimInstalled = false
+function installClodopWebSocketShim() {
+  if (wsShimInstalled || typeof window === 'undefined') return
+  if (!isSecureAppContext()) return
+  wsShimInstalled = true
+
+  const Orig = window.WebSocket
+  const rewrite = (url: string | URL): string => {
+    const s = String(url)
+    // 本机回环仍直连（电脑调试）
+    if (/^wss?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(s)) return s
+    const isClodopWs =
+      /c_webskt/i.test(s) ||
+      /:(8000|18000|8443)(\/|$)/.test(s) ||
+      /^wss?:\/\/\d{1,3}(\.\d{1,3}){3}/.test(s)
+    if (!isClodopWs) return s
+    const proxy = getClodopProxyBase().replace(/\/+$/, '')
+    const wsBase = proxy.replace(/^http/i, 'ws') // https→wss / http→ws
+    return `${wsBase}/c_webskt/`
+  }
+
+  const Patched = function (this: WebSocket, url: string | URL, protocols?: string | string[]) {
+    const next = rewrite(url)
+    return protocols !== undefined ? new Orig(next, protocols) : new Orig(next)
+  } as unknown as typeof WebSocket
+
+  Patched.prototype = Orig.prototype
+  Object.defineProperty(Patched, 'CONNECTING', { value: Orig.CONNECTING })
+  Object.defineProperty(Patched, 'OPEN', { value: Orig.OPEN })
+  Object.defineProperty(Patched, 'CLOSING', { value: Orig.CLOSING })
+  Object.defineProperty(Patched, 'CLOSED', { value: Orig.CLOSED })
+  window.WebSocket = Patched
+}
+
 type LodopInstance = {
+  strHostURI?: string
+  webskt?: { readyState?: number; close?: () => void }
+  OpenWebSocket?: () => void
   PRINT_INIT: (title: string) => void
   SET_PRINT_PAGESIZE: (intOrient: number, pageWidth: number | string, pageHeight: number | string, pageName: string) => void
   ADD_PRINT_PDF: (top: number | string, left: number | string, width: number | string, height: number | string, data: string) => void
@@ -137,48 +216,103 @@ function getLodopIfReady(): LodopInstance | null {
 }
 
 function buildLodopCandidates(): string[] {
-  const base = getClodopServiceBase()
   const list: string[] = []
-  if (base) {
-    list.push(`${base}/CLodopfuncs.js?priority=1`)
-    // 常用备用端口（同主机）
-    try {
-      const u = new URL(base)
-      const host = u.hostname
-      if (u.port === '8000' || !u.port) {
-        list.push(`${u.protocol}//${host}:18000/CLodopfuncs.js?priority=0`)
-      }
-    } catch {
-      /* ignore */
-    }
+  const primary = resolveClodopLoadBase()
+  if (primary) {
+    list.push(`${primary}/CLodopfuncs.js?priority=1`)
   }
-  // 手机浏览器本机一般没有 C-Lodop；仍保留 localhost 兜底（平板/同机调试）
-  list.push(
-    'http://localhost:8000/CLodopfuncs.js?priority=1',
-    'http://127.0.0.1:8000/CLodopfuncs.js?priority=1',
-    'http://localhost:18000/CLodopfuncs.js?priority=0',
-    'https://localhost:8443/CLodopfuncs.js?priority=1',
-  )
+  // HTTPS 页不要再尝试局域网 http（会被浏览器直接拦截，徒增报错）
+  if (!isSecureAppContext()) {
+    const base = getClodopServiceBase()
+    if (base && base !== primary) {
+      list.push(`${base}/CLodopfuncs.js?priority=1`)
+      try {
+        const u = new URL(base)
+        const host = u.hostname
+        if (u.port === '8000' || !u.port) {
+          list.push(`${u.protocol}//${host}:18000/CLodopfuncs.js?priority=0`)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    list.push(
+      'http://localhost:8000/CLodopfuncs.js?priority=1',
+      'http://127.0.0.1:8000/CLodopfuncs.js?priority=1',
+      'http://localhost:18000/CLodopfuncs.js?priority=0',
+    )
+  }
   return [...new Set(list)]
 }
 
 export async function ensureLocalPrintService(): Promise<LodopInstance> {
+  installClodopWebSocketShim()
+  const loadBase = resolveClodopLoadBase()
   const ready = getLodopIfReady()
-  if (ready) return ready
+  if (ready) {
+    patchLodopHostURI(ready, loadBase)
+    await ensureLodopWebSocket(ready)
+    return ready
+  }
 
   const candidates = buildLodopCandidates()
-  await Promise.allSettled(candidates.map((u) => loadScript(u)))
+  const results = await Promise.allSettled(candidates.map((u) => loadScript(u)))
   await wait(400)
 
   const again = getLodopIfReady()
-  if (again) return again
+  if (again) {
+    patchLodopHostURI(again, loadBase)
+    await ensureLodopWebSocket(again)
+    return again
+  }
 
+  const failedAll = results.every((r) => r.status === 'rejected')
+  if (isSecureAppContext()) {
+    throw new Error(
+      failedAll
+        ? `无法经网站代理加载 C-Lodop（${loadBase}）。请确认：1) 打印电脑已启动 C-Lodop；2) 服务器能访问局域网 C-Lodop；3) 已配置 CLODOP_HTTP_UPSTREAM。`
+        : `已加载脚本但未就绪。请刷新后重试；仍失败则检查 Caddy 反代 /apps/ops-m/clodop/ → C-Lodop。`,
+    )
+  }
   const configured = getClodopServiceBase()
   throw new Error(
     configured
-      ? `无法连接 C-Lodop（${configured}）。请确认：1) Windows 已启动 C-Lodop；2) 手机与打印机能同局域网访问；3) 防火墙放行 8000/18000。`
-      : '未配置 C-Lodop 服务地址。请到「打印机管理」填写局域网中 Windows 主机的 IP（如 http://192.168.3.10:8000）。',
+      ? `无法连接 C-Lodop（${configured}）。请确认 Windows 已启动 C-Lodop，且本机可访问该地址。`
+      : '未配置 C-Lodop 服务地址。请到「打印机管理」填写局域网中 Windows 主机的 IP。',
   )
+}
+
+/** 等待 / 重连 C-Lodop WebSocket（打印指令依赖它） */
+async function ensureLodopWebSocket(LODOP: LodopInstance, timeoutMs = 10000) {
+  let lastOpen = 0
+  const tryOpen = () => {
+    try {
+      if (LODOP.webskt && LODOP.webskt.readyState !== 1) {
+        try {
+          LODOP.webskt.close?.()
+        } catch {
+          /* ignore */
+        }
+        LODOP.webskt = undefined
+      }
+      LODOP.OpenWebSocket?.()
+      lastOpen = Date.now()
+    } catch {
+      /* ignore */
+    }
+  }
+  tryOpen()
+  const start = Date.now()
+  while (Date.now() - start < timeoutMs) {
+    if (LODOP.webskt?.readyState === 1) return
+    if (Date.now() - lastOpen >= 2000) tryOpen()
+    await wait(200)
+  }
+  if (isSecureAppContext()) {
+    throw new Error(
+      'C-Lodop WebSocket 未就绪。已通过网站代理加载脚本，但 wss 通道未接通；请确认 Caddy 反代支持 /apps/ops-m/clodop/c_webskt/，且打印电脑 C-Lodop 在线。',
+    )
+  }
 }
 
 /**
