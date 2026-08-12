@@ -5,7 +5,7 @@
       <van-search
         v-model="keyword"
         shape="round"
-        placeholder="订单号 / 买家 / 手机"
+        placeholder="单号 / 关联销售单 / 买家"
         show-action
         @search="reload"
       >
@@ -13,6 +13,7 @@
           <div class="search-action" @click="reload">搜索</div>
         </template>
       </van-search>
+      <div class="range-hint">创建时间</div>
       <DateRangeBar :start="rangeStart" :end="rangeEnd" @change="onRangeChange" />
 
       <div class="status-bar">
@@ -25,7 +26,7 @@
           @click="onTabChange(tab.key)"
         >
           {{ tab.label }}
-          <span class="status-chip__n">{{ tab.count }}</span>
+          <span v-if="tab.count != null" class="status-chip__n">{{ tab.count }}</span>
         </button>
       </div>
 
@@ -46,6 +47,9 @@
                 class="ops-tag order-card__tag"
                 :class="shipTagClass(row.status)"
               >{{ labelSelfShipStatus(row.status) }}</span>
+              <span class="ops-tag order-card__tag" :class="payTagClass(row.payStatus)">
+                {{ labelSelfPayStatus(row.payStatus) }}
+              </span>
             </div>
           </div>
           <div class="receiver-line">
@@ -80,23 +84,32 @@ import {
   type SelfOrderListItem,
   type SelfOrderStatusCounts,
 } from '../api/selfOrder'
-import { formatOrderSource, formatTime, labelSelfDocStatus, labelSelfShipStatus, deriveSelfShipStatus } from '../utils/labels'
-import { toApiDateTimeRange, todayDay } from '../utils/dateRange'
+import {
+  formatOrderSource,
+  formatTime,
+  labelSelfDocStatus,
+  labelSelfShipStatus,
+  labelSelfPayStatus,
+  deriveSelfShipStatus,
+} from '../utils/labels'
+import { daysAgo, toApiDateTimeRange, todayDay } from '../utils/dateRange'
 
 type StatusTabKey =
   | 'all'
   | 'wait_ship'
   | 'shipped'
   | 'partial_shipped'
-  | 'unpaid'
-  | 'paid'
+  | 'pay_unpaid'
+  | 'pay_partial'
+  | 'pay_paid'
+  | 'ordered'
   | 'completed'
   | 'cancelled'
-  | 'draft'
 
 const router = useRouter()
 const keyword = ref('')
-const rangeStart = ref(todayDay())
+/** 默认近 7 天创建时间，对齐电脑端 */
+const rangeStart = ref(daysAgo(6))
 const rangeEnd = ref(todayDay())
 const activeTab = ref<StatusTabKey>('all')
 const counts = ref<SelfOrderStatusCounts>({
@@ -113,17 +126,21 @@ const page = ref(1)
 const statusTabs = computed(() => {
   const by = counts.value.byStatus || {}
   const n = (k: string) => Number(by[k] || 0)
-  // 发货态：全部之后按 待发货 → 已发货 → 部分发货（对齐电脑端发货筛选语义）
+  const completed = n('completed')
+  const cancelled = n('cancelled')
+  const all = Number(counts.value.all || 0)
+  const ordered = Math.max(0, all - completed - cancelled)
   return [
-    { key: 'all' as const, label: '全部', count: Number(counts.value.all || 0) },
+    { key: 'all' as const, label: '全部', count: all },
     { key: 'wait_ship' as const, label: '待发货', count: Number(counts.value.waitShip || 0) },
-    { key: 'shipped' as const, label: '已发货', count: n('shipped') + n('completed') },
+    { key: 'shipped' as const, label: '已发货', count: n('shipped') + completed },
     { key: 'partial_shipped' as const, label: '部分发货', count: n('partial_shipped') },
-    { key: 'unpaid' as const, label: '待付款', count: Number(counts.value.unpaid || 0) },
-    { key: 'paid' as const, label: '已付款', count: n('paid') + n('partial_shipped') + n('shipped') },
-    { key: 'completed' as const, label: '已完成', count: n('completed') },
-    { key: 'cancelled' as const, label: '已取消', count: n('cancelled') },
-    { key: 'draft' as const, label: '草稿', count: n('draft') },
+    { key: 'pay_unpaid' as const, label: '未付款', count: Number(counts.value.unpaid || 0) },
+    { key: 'pay_partial' as const, label: '部分付款', count: null as number | null },
+    { key: 'pay_paid' as const, label: '已付清', count: null as number | null },
+    { key: 'ordered' as const, label: '已下单', count: ordered },
+    { key: 'completed' as const, label: '已完成', count: completed },
+    { key: 'cancelled' as const, label: '已取消', count: cancelled },
   ]
 })
 
@@ -135,6 +152,13 @@ function shipTagClass(status?: string) {
   const ship = deriveSelfShipStatus(status)
   if (ship === 'shipped') return 'ops-tag--ok'
   if (ship === 'partial_shipped' || ship === 'wait_ship') return 'ops-tag--warn'
+  return ''
+}
+
+function payTagClass(pay?: string) {
+  const s = (pay || 'unpaid').trim()
+  if (s === 'paid') return 'ops-tag--ok'
+  if (s === 'partial') return 'ops-tag--warn'
   return ''
 }
 
@@ -152,8 +176,8 @@ function listParams() {
   const { start, end } = toApiDateTimeRange(rangeStart.value, rangeEnd.value)
   const base: Parameters<typeof listSelfOrders>[0] = {
     keyword: keyword.value.trim() || undefined,
-    orderedAtStart: start,
-    orderedAtEnd: end,
+    createdAtStart: start,
+    createdAtEnd: end,
     page: page.value,
     pageSize: 20,
   }
@@ -167,22 +191,26 @@ function listParams() {
     case 'partial_shipped':
       base.shipStatus = 'partial_shipped'
       break
-    case 'unpaid':
-      base.payStatus = 'unpaid,partial'
-      base.excludeStatuses = 'draft,cancelled'
+    case 'pay_unpaid':
+      base.payStatus = 'unpaid'
+      base.excludeStatuses = 'cancelled'
       break
-    case 'paid':
-      // 电脑端「已付款」含部分发货/已发货
-      base.status = 'paid'
+    case 'pay_partial':
+      base.payStatus = 'partial'
+      base.excludeStatuses = 'cancelled'
+      break
+    case 'pay_paid':
+      base.payStatus = 'paid'
+      base.excludeStatuses = 'cancelled'
+      break
+    case 'ordered':
+      base.status = 'ordered'
       break
     case 'completed':
       base.status = 'completed'
       break
     case 'cancelled':
       base.status = 'cancelled'
-      break
-    case 'draft':
-      base.status = 'draft'
       break
     default:
       break
@@ -207,8 +235,8 @@ async function refreshCounts() {
     const { start, end } = toApiDateTimeRange(rangeStart.value, rangeEnd.value)
     const data = await getSelfOrderStatusCounts({
       keyword: keyword.value.trim() || undefined,
-      orderedAtStart: start,
-      orderedAtEnd: end,
+      createdAtStart: start,
+      createdAtEnd: end,
     })
     counts.value = {
       all: Number(data?.all || 0),
@@ -261,7 +289,7 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
-  max-width: 58%;
+  max-width: 62%;
 }
 .order-card__foot {
   display: flex;
@@ -273,6 +301,12 @@ onMounted(() => {
   font-size: 12px;
   color: var(--ops-muted);
   font-variant-numeric: tabular-nums;
+}
+.range-hint {
+  padding: 0 16px 4px;
+  font-size: 12px;
+  color: var(--ops-muted);
+  font-weight: 600;
 }
 .search-action {
   color: var(--ops-primary);

@@ -11,7 +11,7 @@
             class="ops-tag"
             :class="shipTagClass(detail.status)"
           >{{ labelSelfShipStatus(detail.status) }}</span>
-          <span class="ops-tag ops-tag--warn">{{ payLabel(detail.payStatus) }}</span>
+          <span class="ops-tag" :class="payTagClass(detail.payStatus)">{{ labelSelfPayStatus(detail.payStatus) }}</span>
         </div>
         <div class="detail-hero__price">¥{{ Number(detail.saleAmount || 0).toFixed(2) }}</div>
       </div>
@@ -48,25 +48,31 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, closeToast } from 'vant'
 import { getSelfOrder, type SelfOrderDetail } from '../api/selfOrder'
-import { formatOrderSource, formatTime, labelSelfDocStatus, labelSelfShipStatus, deriveSelfShipStatus } from '../utils/labels'
+import {
+  formatOrderSource,
+  formatTime,
+  labelSelfDocStatus,
+  labelSelfShipStatus,
+  labelSelfPayStatus,
+  deriveSelfShipStatus,
+} from '../utils/labels'
 
 const route = useRoute()
 const router = useRouter()
 const detail = ref<SelfOrderDetail | null>(null)
 const loading = ref(true)
 
-function payLabel(v?: string) {
-  if (!v) return '未付款'
-  if (v === 'paid') return '已付款'
-  if (v === 'unpaid') return '未付款'
-  if (v === 'partial') return '部分付款'
-  return v
-}
-
 function shipTagClass(status?: string) {
   const ship = deriveSelfShipStatus(status)
   if (ship === 'shipped') return 'ops-tag--ok'
   if (ship === 'partial_shipped' || ship === 'wait_ship') return 'ops-tag--warn'
+  return ''
+}
+
+function payTagClass(pay?: string) {
+  const s = (pay || 'unpaid').trim()
+  if (s === 'paid') return 'ops-tag--ok'
+  if (s === 'partial') return 'ops-tag--warn'
   return ''
 }
 

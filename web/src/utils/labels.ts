@@ -1,9 +1,6 @@
-/** 自营单据状态（发货进度单独展示） */
+/** 单据状态展示：已下单 / 已完成 / 已取消（付款中/发货中均归为已下单） */
 const selfDocStatusLabels: Record<string, string> = {
-  draft: '草稿',
   ordered: '已下单',
-  confirmed: '已下单',
-  paid: '已付款',
   completed: '已完成',
   cancelled: '已取消',
 }
@@ -13,6 +10,13 @@ const selfShipStatusLabels: Record<string, string> = {
   wait_ship: '待发货',
   partial_shipped: '部分发货',
   shipped: '已发货',
+}
+
+/** 付款状态 */
+const selfPayStatusLabels: Record<string, string> = {
+  unpaid: '未付款',
+  partial: '部分付款',
+  paid: '已付清',
 }
 
 /** OMS 履约状态 */
@@ -52,12 +56,13 @@ const platformLabels: Record<string, string> = {
   MANUAL: '手工单',
 }
 
-/** 单据状态：部分发货/已发货仍属已付款阶段 */
+/** 单据状态：仅区分已下单 / 已完成 / 已取消 */
 export function deriveSelfDocStatus(status?: string): string {
   const s = (status || '').trim()
-  if (s === 'partial_shipped' || s === 'shipped') return 'paid'
-  if (s === 'confirmed') return 'ordered'
-  return s
+  if (s === 'completed') return 'completed'
+  if (s === 'cancelled') return 'cancelled'
+  if (!s) return ''
+  return 'ordered'
 }
 
 export function deriveSelfShipStatus(status?: string): string {
@@ -67,6 +72,7 @@ export function deriveSelfShipStatus(status?: string): string {
     case 'shipped':
     case 'completed':
       return 'shipped'
+    case 'draft':
     case 'ordered':
     case 'paid':
     case 'confirmed':
@@ -79,7 +85,7 @@ export function deriveSelfShipStatus(status?: string): string {
 export function labelSelfDocStatus(v?: string) {
   const doc = deriveSelfDocStatus(v)
   if (!doc) return '-'
-  return selfDocStatusLabels[doc] || selfDocStatusLabels[v || ''] || v || '-'
+  return selfDocStatusLabels[doc] || v || '-'
 }
 
 export function labelSelfShipStatus(v?: string) {
@@ -88,7 +94,13 @@ export function labelSelfShipStatus(v?: string) {
   return selfShipStatusLabels[ship] || ship
 }
 
-/** @deprecated 兼容旧调用：优先展示发货进度，否则单据状态 */
+export function labelSelfPayStatus(v?: string) {
+  const s = (v || '').trim()
+  if (!s) return '未付款'
+  return selfPayStatusLabels[s] || s
+}
+
+/** @deprecated 兼容旧调用 */
 export function labelSelfStatus(v?: string) {
   return labelSelfShipStatus(v) || labelSelfDocStatus(v)
 }

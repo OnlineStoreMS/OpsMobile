@@ -58,6 +58,10 @@ export async function listSelfOrders(params: {
   excludeStatuses?: string
   payStatus?: string
   shipStatus?: string
+  /** 自营单创建时间（≈分配时间） */
+  createdAtStart?: string
+  createdAtEnd?: string
+  /** 销售单下单时间 */
   orderedAtStart?: string
   orderedAtEnd?: string
   page?: number
@@ -75,6 +79,8 @@ export interface SelfOrderStatusCounts {
 
 export async function getSelfOrderStatusCounts(params: {
   keyword?: string
+  createdAtStart?: string
+  createdAtEnd?: string
   orderedAtStart?: string
   orderedAtEnd?: string
 }) {
