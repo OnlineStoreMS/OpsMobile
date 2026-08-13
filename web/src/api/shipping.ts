@@ -13,6 +13,7 @@ export interface CarrierAccount {
   customTemplateCode?: string
   signMode: string
   printChannel: string
+  printLogo?: boolean
   env: string
   enabled: boolean
   remark: string
@@ -144,6 +145,8 @@ export interface Shipment {
   status: string
   errorMessage?: string
   cargoName: string
+  /** 首次发货/出单时间 */
+  shippedAt?: string
   printedAt?: string
   createdAt?: string
   orderCoreOrderId?: number

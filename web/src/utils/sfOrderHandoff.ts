@@ -28,7 +28,7 @@ export function shippedQtyByItem(order: OMSOrder): Record<number, number> {
       }
     }
   }
-  if (!hasItemRows && order.shipStatus === 'shipped') {
+  if (!hasItemRows && (order.shipments || []).length > 0 && order.shipStatus === 'shipped') {
     for (const it of order.items || []) {
       if (it.id) map[it.id] = it.quantity || 0
     }

@@ -38,7 +38,7 @@
             <div>来源 <strong>{{ formatOrderSource(row) }}</strong></div>
           </div>
           <div class="order-card__foot">
-            <div class="order-card__time">{{ formatTime(row.printedAt || row.createdAt) }}</div>
+            <div class="order-card__time">发货 {{ formatTime(row.shippedAt || row.printedAt || row.createdAt) }}</div>
             <div class="order-card__actions" @click.stop>
               <van-button
                 v-if="canReprint(row)"
