@@ -26,26 +26,32 @@
       </div>
       <div class="card">
         <div class="ship-items-hd" v-if="shipRows.length">
-          <van-checkbox
-            :model-value="allSelected"
-            :indeterminate="indeterminate"
-            @click.prevent.stop="toggleAll"
-          >
-            全选
-          </van-checkbox>
+          <button type="button" class="check-all" @click="toggleAll">
+            <span class="check-box" :class="{ 'check-box--on': allSelected, 'check-box--half': indeterminate }">
+              <van-icon v-if="allSelected" name="success" />
+              <span v-else-if="indeterminate" class="check-box__dash" />
+            </span>
+            <span>全选</span>
+          </button>
           <span class="muted hd-hint" v-if="doneRows.length">
             另有 {{ doneRows.length }} 件已发完
           </span>
         </div>
-        <van-checkbox-group v-model="selectedIndexes">
-          <div
+        <div class="goods-list">
+          <button
             v-for="row in shipRows"
             :key="row.index"
+            type="button"
             class="goods-row"
-            role="button"
             @click="toggleItem(row.index)"
           >
-            <van-checkbox :name="row.index" @click.stop />
+            <span
+              class="check-box"
+              :class="{ 'check-box--on': selectedIndexes.includes(row.index) }"
+              aria-hidden="true"
+            >
+              <van-icon v-if="selectedIndexes.includes(row.index)" name="success" />
+            </span>
             <img v-if="row.item.picUrl" :src="row.item.picUrl" alt="" />
             <div class="goods-info">
               <div class="goods-name">{{ row.item.skuSpecs || row.item.productName || '商品' }}</div>
@@ -54,8 +60,8 @@
                 <span v-if="row.shipped > 0"> · 已发 {{ row.shipped }}/{{ row.item.quantity || 0 }}</span>
               </div>
             </div>
-          </div>
-        </van-checkbox-group>
+          </button>
+        </div>
         <div v-if="!shipRows.length" class="muted empty-ship">
           {{ (order.items || []).length ? '商品均已发完，无需再发' : '无商品行' }}
         </div>
@@ -763,21 +769,69 @@ onMounted(async () => {
   border-bottom: 1px solid var(--ops-line);
   margin-bottom: 4px;
 }
+.check-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ops-ink);
+  cursor: pointer;
+}
+.check-box {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1.5px solid #c4c9d2;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: border-color 0.15s, background 0.15s;
+}
+.check-box--on {
+  border-color: var(--ops-primary);
+  background: var(--ops-primary);
+}
+.check-box--half {
+  border-color: var(--ops-primary);
+  background: #fff;
+}
+.check-box__dash {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--ops-primary);
+}
 .hd-hint {
   font-size: 12px;
+}
+.goods-list {
+  display: flex;
+  flex-direction: column;
 }
 .goods-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 4px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 2px;
+  border: 0;
   border-bottom: 1px solid var(--ops-line);
+  background: transparent;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
 .goods-row:active {
-  opacity: 0.85;
+  opacity: 0.88;
 }
 .goods-row:last-of-type {
   border-bottom: none;

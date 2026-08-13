@@ -91,3 +91,42 @@ export async function getSelfOrderStatusCounts(params: {
 export async function getSelfOrder(id: number) {
   return unwrap<SelfOrderDetail>(await selfClient.get(`/self-orders/${id}`))
 }
+
+export interface SelfShipmentItem {
+  id?: number
+  selfOrderItemId: number
+  qty: number
+}
+
+export interface SelfShipment {
+  id: number
+  selfOrderId: number
+  shipmentNo: string
+  status: string
+  carrierCode?: string
+  carrierName?: string
+  trackingNo?: string
+  shippedAt?: string
+  expectedArrivalDate?: string
+  deliveredAt?: string
+  callbackOk: boolean
+  stockDeducted: boolean
+  receiverName?: string
+  receiverPhone?: string
+  receiverAddress?: string
+  remark?: string
+  items: SelfShipmentItem[]
+  createdAt: string
+}
+
+export const SELF_SHIPMENT_STATUS_MAP: Record<string, string> = {
+  pending: '待发货',
+  shipped: '已发货',
+  in_transit: '运输中',
+  delivered: '已签收',
+  exception: '异常',
+}
+
+export async function listSelfShipments(selfOrderId: number) {
+  return unwrap<SelfShipment[]>(await selfClient.get(`/self-orders/${selfOrderId}/shipments`))
+}
