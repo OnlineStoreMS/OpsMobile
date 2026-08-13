@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <van-nav-bar class="ops-nav" title="已发货详情" left-arrow @click-left="router.back()">
-      <template #right>
+      <template v-if="isSFManaged" #right>
         <span class="nav-link" @click="router.push('/printers')">打印机</span>
       </template>
     </van-nav-bar>
@@ -22,7 +22,11 @@
       <div class="section-label">运单信息</div>
       <div class="card">
         <div class="detail-row"><span class="label">运单号</span><span class="value">{{ detail.mailNo || '-' }}</span></div>
-        <div class="detail-row" v-if="detail.mailNo">
+        <div class="detail-row" v-if="detail.expressCompany || isKdzs">
+          <span class="label">发货方式</span>
+          <span class="value">{{ isKdzs ? `快递助手${detail.expressCompany ? ` · ${detail.expressCompany}` : ''}` : detail.expressCompany }}</span>
+        </div>
+        <div class="detail-row" v-if="detail.mailNo && isSFManaged">
           <span class="label">预计派送</span>
           <span class="value">
             <template v-if="promiseLoading">查询中…</template>
@@ -36,57 +40,61 @@
         <div class="detail-row"><span class="label">地址</span><span class="value">{{ addrText }}</span></div>
         <div class="detail-row"><span class="label">货物</span><span class="value">{{ detail.cargoName || '-' }}</span></div>
         <div class="detail-row"><span class="label">发货时间</span><span class="value">{{ formatTime(detail.shippedAt || (detail.mailNo ? detail.createdAt : '') || '') }}</span></div>
-        <div class="detail-row"><span class="label">打印时间</span><span class="value">{{ formatTime(detail.printedAt) || '-' }}</span></div>
-        <div class="detail-row">
+        <div class="detail-row" v-if="isSFManaged">
+          <span class="label">打印时间</span><span class="value">{{ formatTime(detail.printedAt) || '-' }}</span>
+        </div>
+        <div class="detail-row" v-if="isSFManaged">
           <span class="label">打印机</span>
           <span class="value">{{ printerHint }}</span>
         </div>
       </div>
 
-      <div class="section-label">面单</div>
-      <div class="card label-card">
-        <template v-if="detail.labelPdfUrl">
-          <div v-if="labelLoading" class="muted label-tip">面单图片加载中…</div>
-          <div v-else-if="labelError" class="label-tip">
-            <div class="tip tip--warn">{{ labelError }}</div>
-            <van-button size="small" plain hairline type="primary" block @click="openLabelPdf">打开 PDF</van-button>
-          </div>
-          <template v-else-if="labelPng">
-            <van-image
-              :src="labelPng"
-              fit="contain"
-              width="100%"
-              class="label-img"
-              @click="previewLabel"
-            />
-            <div class="label-actions">
-              <van-button size="small" type="primary" block :loading="saving" @click="saveLabelPng">保存图片</van-button>
-              <van-button size="small" plain hairline type="primary" block @click="copyLabelLink">复制链接</van-button>
+      <template v-if="showSFOps">
+        <div class="section-label">面单</div>
+        <div class="card label-card">
+          <template v-if="detail.labelPdfUrl">
+            <div v-if="labelLoading" class="muted label-tip">面单图片加载中…</div>
+            <div v-else-if="labelError" class="label-tip">
+              <div class="tip tip--warn">{{ labelError }}</div>
+              <van-button size="small" plain hairline type="primary" block @click="openLabelPdf">打开 PDF</van-button>
             </div>
-            <div class="muted label-tip">点击放大；长按图片也可保存后发给顾客</div>
+            <template v-else-if="labelPng">
+              <van-image
+                :src="labelPng"
+                fit="contain"
+                width="100%"
+                class="label-img"
+                @click="previewLabel"
+              />
+              <div class="label-actions">
+                <van-button size="small" type="primary" block :loading="saving" @click="saveLabelPng">保存图片</van-button>
+                <van-button size="small" plain hairline type="primary" block @click="copyLabelLink">复制链接</van-button>
+              </div>
+              <div class="muted label-tip">点击放大；长按图片也可保存后发给顾客</div>
+            </template>
           </template>
-        </template>
-        <div v-else class="muted label-tip">打印后自动存档面单，请稍后下拉刷新</div>
-      </div>
+          <div v-else class="muted label-tip">打印后自动存档面单，请稍后下拉刷新</div>
+        </div>
 
-      <div class="section-label">物流账号</div>
-      <div class="card">
-        <button type="button" class="pick-row" @click="showCarrier = true">
-          <span class="pick-row__badge carrier">账</span>
-          <div class="pick-row__body">
-            <div class="pick-row__label">打印用账号</div>
-            <div class="pick-row__title">{{ selectedCarrier?.name || '请选择物流账号' }}</div>
-            <div class="muted pick-row__sub" v-if="selectedCarrier">
-              {{ selectedCarrier.carrierCode || 'SF' }}
-              <template v-if="selectedCarrier.custId"> · 月结 {{ selectedCarrier.custId }}</template>
-              <template v-else> · 现结可用</template>
-              · {{ printChannelLabel }}
+        <div class="section-label">物流账号</div>
+        <div class="card">
+          <button type="button" class="pick-row" @click="showCarrier = true">
+            <span class="pick-row__badge carrier">账</span>
+            <div class="pick-row__body">
+              <div class="pick-row__label">打印用账号</div>
+              <div class="pick-row__title">{{ selectedCarrier?.name || '请选择物流账号' }}</div>
+              <div class="muted pick-row__sub" v-if="selectedCarrier">
+                {{ selectedCarrier.carrierCode || 'SF' }}
+                <template v-if="selectedCarrier.custId"> · 月结 {{ selectedCarrier.custId }}</template>
+                <template v-else> · 现结可用</template>
+                · {{ printChannelLabel }}
+              </div>
+              <div class="tip tip--warn" v-else>请先选账号才能再次打印</div>
             </div>
-            <div class="tip tip--warn" v-else>手动填单号等场景需先选账号才能再次打印</div>
-          </div>
-          <van-icon name="arrow" class="pick-row__arrow" />
-        </button>
-      </div>
+            <van-icon name="arrow" class="pick-row__arrow" />
+          </button>
+        </div>
+      </template>
 
       <div class="section-label" v-if="detail.items?.length">明细</div>
       <div class="card" v-if="detail.items?.length">
@@ -98,7 +106,7 @@
         </div>
       </div>
 
-      <div class="footer-safe" v-if="canReprint || canCancel">
+      <div class="footer-safe" v-if="showSFOps && (canReprint || canCancel)">
         <van-button
           v-if="canReprint"
           type="primary"
@@ -133,13 +141,13 @@
       <div class="footer-safe" v-else-if="detail.status === 'cancelled'">
         <div class="muted reprint-tip">运单已取消（保留记录，不可再打印）</div>
       </div>
-      <div class="footer-safe" v-else-if="!detail.mailNo">
-        <div class="muted reprint-tip">无运单号（可能为手动填单号发货），无法云打印面单</div>
+      <div class="footer-safe" v-else-if="isKdzs">
+        <div class="muted reprint-tip">快递助手发货单：运单取消与打印请在快递助手完成</div>
       </div>
     </div>
     <van-empty v-else-if="!loading" description="未找到运单" />
 
-    <van-popup v-model:show="showCarrier" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
+    <van-popup v-if="showSFOps" v-model:show="showCarrier" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
       <div class="sheet">
         <div class="sheet-title">选择物流账号</div>
         <button
@@ -184,6 +192,7 @@ import {
   downloadDataUrl,
   renderLabelPdfToPng,
 } from '../utils/labelPdfPreview'
+import { isKdzsShipment, isSFManagedShipment } from '../utils/shipmentFlags'
 
 const route = useRoute()
 const router = useRouter()
@@ -233,16 +242,21 @@ const printChannel = computed(() => {
 
 const printChannelLabel = computed(() => (printChannel.value === 'pdf' ? 'PDF 通道' : '插件通道'))
 
+const isSFManaged = computed(() => isSFManagedShipment(detail.value))
+const isKdzs = computed(() => isKdzsShipment(detail.value))
+/** 仅顺丰托管单展示面单 / 物流账号 / 再次打印 / 取消快递单 */
+const showSFOps = computed(() => isSFManaged.value && !isKdzs.value)
+
 const canReprint = computed(() => {
   const d = detail.value
-  if (!d) return false
+  if (!d || !showSFOps.value) return false
   if (d.status === 'cancelled') return false
   return !!d.mailNo
 })
 
 const canCancel = computed(() => {
   const d = detail.value
-  if (!d) return false
+  if (!d || !showSFOps.value) return false
   return d.status !== 'cancelled' && d.status !== 'draft'
 })
 
@@ -261,12 +275,22 @@ function pickCarrier(id: number) {
 }
 
 async function loadLabelPreview(ship: Shipment) {
-  const url = (ship.labelPdfUrl || '').trim()
   labelPng.value = ''
   labelError.value = ''
-  if (!url) return
   labelLoading.value = true
   try {
+    // 再打印后存档 URL 会更新，尽量用最新详情
+    let url = (ship.labelPdfUrl || '').trim()
+    try {
+      const fresh = await getShipment(ship.id)
+      if (fresh) {
+        detail.value = fresh
+        url = (fresh.labelPdfUrl || '').trim()
+      }
+    } catch {
+      /* 用传入的 ship 即可 */
+    }
+    if (!url) return
     labelPng.value = await renderLabelPdfToPng(url)
   } catch (e) {
     labelError.value = (e as Error).message || '面单渲染失败'
@@ -364,6 +388,10 @@ async function reprint() {
     if (detail.value) {
       initCarrierSelection(detail.value, carriers.value)
       void loadLabelPreview(detail.value)
+      // 插件通道存档可能略晚于打印返回，稍后再刷一次面单
+      window.setTimeout(() => {
+        if (detail.value) void loadLabelPreview(detail.value)
+      }, 2500)
     }
   } catch (e) {
     const msg = (e as Error).message || ''
@@ -405,7 +433,7 @@ async function cancelWaybill() {
 async function loadPromiseTm(ship: Shipment) {
   promiseLabel.value = ''
   promiseHint.value = ''
-  if (!ship.mailNo?.trim()) return
+  if (!ship.mailNo?.trim() || !isSFManagedShipment(ship)) return
   promiseLoading.value = true
   try {
     const res = await shippingApi.searchPromiseTm(ship.id)
@@ -422,15 +450,17 @@ onMounted(async () => {
   const id = Number(route.params.id)
   showLoadingToast({ message: '加载中…', forbidClick: true, duration: 0 })
   try {
-    const [ship, cRes] = await Promise.all([
-      getShipment(id),
-      shippingApi.listCarrierAccounts({ page: 1, pageSize: 100 }).catch(() => ({ list: [] as CarrierAccount[] })),
-    ])
+    const ship = await getShipment(id)
     detail.value = ship
-    carriers.value = cRes.list || []
-    initCarrierSelection(ship, carriers.value)
-    void loadLabelPreview(ship)
-    void loadPromiseTm(ship)
+    if (isSFManagedShipment(ship) && !isKdzsShipment(ship)) {
+      const cRes = await shippingApi
+        .listCarrierAccounts({ page: 1, pageSize: 100 })
+        .catch(() => ({ list: [] as CarrierAccount[] }))
+      carriers.value = cRes.list || []
+      initCarrierSelection(ship, carriers.value)
+      void loadLabelPreview(ship)
+      void loadPromiseTm(ship)
+    }
   } catch (e: any) {
     showFailToast(e.message || '加载失败')
   } finally {

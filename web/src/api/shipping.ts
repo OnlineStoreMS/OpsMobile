@@ -142,6 +142,9 @@ export interface Shipment {
   receiverCounty: string
   receiverAddress: string
   mailNo: string
+  /** 发货通道：sf=丰桥；kdzs=快递助手 */
+  shipVia?: 'sf' | 'kdzs' | string
+  expressCompany?: string
   status: string
   errorMessage?: string
   cargoName: string
@@ -150,6 +153,7 @@ export interface Shipment {
   printedAt?: string
   createdAt?: string
   orderCoreOrderId?: number
+  sfOrderId?: string
   labelUrl?: string
   labelPdfUrl?: string
   printChannel?: string

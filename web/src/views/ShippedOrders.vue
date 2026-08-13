@@ -120,6 +120,7 @@ import { formatOrderSource, formatTime } from '../utils/labels'
 import { toApiDateTimeRange, todayDay } from '../utils/dateRange'
 import { printShipmentByChannel } from '../utils/sfPrintLabel'
 import { getSavedPrinterIndex, getSavedPrinterName } from '../utils/sfPrintPlugin'
+import { isKdzsShipment, isSFManagedShipment } from '../utils/shipmentFlags'
 
 const router = useRouter()
 const keyword = ref('')
@@ -154,11 +155,11 @@ function shipTimeText(row: Shipment) {
 }
 
 function canReprint(row: Shipment) {
-  return !!row.mailNo && row.status !== 'cancelled'
+  return !!row.mailNo && row.status !== 'cancelled' && isSFManagedShipment(row) && !isKdzsShipment(row)
 }
 
 function canCancel(row: Shipment) {
-  return row.status !== 'cancelled' && row.status !== 'draft'
+  return row.status !== 'cancelled' && row.status !== 'draft' && !isKdzsShipment(row)
 }
 
 function printChannelOf(carrierId?: number, row?: Shipment | null) {
