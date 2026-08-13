@@ -114,6 +114,8 @@
           <div v-if="form.pickupMode === 'appoint'" class="pickup-tip">
             将通知快递员按所选时段上门揽收
             <span v-if="sendStartTmPreview">（{{ sendStartTmPreview }} 起）</span>
+            <span v-if="pickupWindow"> · 当地可揽 {{ pickupWindow.startTm }}-{{ pickupWindow.endTm }}</span>
+            <span v-if="appointLoading"> · 刷新时段中…</span>
           </div>
         </div>
 
@@ -269,6 +271,7 @@ import {
   decodeAppointLeaf,
   defaultAppointSlot,
   encodeAppointLeaf,
+  mapPickupApiOptions,
   resolveSendStartTm,
   type AppointOption,
 } from '../utils/sfAppointTime'
@@ -328,6 +331,8 @@ const result = ref<{ shipmentId: number; mailNo: string; cancelled?: boolean } |
 const showCarrier = ref(false)
 const showShipper = ref(false)
 const showAppoint = ref(false)
+const appointLoading = ref(false)
+const pickupWindow = ref<{ startTm: string; endTm: string } | null>(null)
 const appointCascaderOptions = ref<AppointOption[]>(buildAppointCascaderOptions())
 /** Vant Cascader 选中叶子 value（时段 key） */
 const appointCascaderValue = ref<string | number>('')
@@ -368,7 +373,7 @@ const printerName = computed(
 )
 const appointLabel = computed(() => appointSlotLabel(appointCascaderOptions.value, form.appointSlot))
 const sendStartTmPreview = computed(() =>
-  resolveSendStartTm(form.pickupMode, form.appointSlot),
+  resolveSendStartTm(form.pickupMode, form.appointSlot, appointCascaderOptions.value),
 )
 
 const namedCargoLines = computed(() => form.cargoLines.filter((l) => (l.name || '').trim()))
@@ -410,27 +415,77 @@ watch(
 
 watch(showAppoint, (open) => {
   if (open) {
-    appointCascaderOptions.value = buildAppointCascaderOptions()
-    const [day, slot] = form.appointSlot
-    appointCascaderValue.value =
-      day !== undefined && day !== null && slot != null
-        ? encodeAppointLeaf(Number(day), String(slot))
-        : ''
+    void refreshPickupOptions().then(() => {
+      const [day, slot] = form.appointSlot
+      appointCascaderValue.value =
+        day !== undefined && day !== null && slot != null
+          ? encodeAppointLeaf(Number(day), String(slot))
+          : ''
+    })
   }
 })
+
+watch(
+  () => [form.carrierAccountId, form.shipperProfileId, form.pickupMode] as const,
+  () => {
+    if (form.pickupMode === 'appoint') void refreshPickupOptions()
+  },
+)
+
+async function refreshPickupOptions() {
+  const carrierId = form.carrierAccountId
+  const shipper = shipperView.value
+  if (!carrierId || !shipper) {
+    appointCascaderOptions.value = buildAppointCascaderOptions()
+    pickupWindow.value = null
+    return
+  }
+  appointLoading.value = true
+  try {
+    const res = await shippingApi.checkPickupTime({
+      carrierAccountId: carrierId,
+      province: shipper.province,
+      city: shipper.city,
+      county: shipper.county,
+      address: shipper.address,
+    })
+    pickupWindow.value = { startTm: res.startTm, endTm: res.endTm }
+    const mapped = mapPickupApiOptions(res.options || [])
+    appointCascaderOptions.value = mapped.length ? mapped : buildAppointCascaderOptions()
+    // 若当前选中时段已不在列表中，重置为第一个可用
+    if (form.appointSlot.length) {
+      const leaf = encodeAppointLeaf(Number(form.appointSlot[0]), String(form.appointSlot[1]))
+      const ok = appointCascaderOptions.value.some((d) =>
+        d.children.some((c) => c.value === leaf),
+      )
+      if (!ok) {
+        const def = defaultAppointSlot(appointCascaderOptions.value)
+        form.appointSlot = [...def]
+      }
+    }
+  } catch {
+    appointCascaderOptions.value = buildAppointCascaderOptions()
+    pickupWindow.value = null
+  } finally {
+    appointLoading.value = false
+  }
+}
 
 function setPickupMode(mode: 'self' | 'appoint') {
   form.pickupMode = mode
   if (mode === 'self') {
     form.appointSlot = []
     appointCascaderValue.value = ''
-  } else if (!form.appointSlot.length) {
-    appointCascaderOptions.value = buildAppointCascaderOptions()
-    const def = defaultAppointSlot(appointCascaderOptions.value)
-    form.appointSlot = [...def]
-    if (def[0] !== undefined && def[1] != null) {
-      appointCascaderValue.value = encodeAppointLeaf(Number(def[0]), String(def[1]))
-    }
+  } else {
+    void refreshPickupOptions().then(() => {
+      if (!form.appointSlot.length) {
+        const def = defaultAppointSlot(appointCascaderOptions.value)
+        form.appointSlot = [...def]
+        if (def[0] !== undefined && def[1] != null) {
+          appointCascaderValue.value = encodeAppointLeaf(Number(def[0]), String(def[1]))
+        }
+      }
+    })
   }
 }
 
@@ -553,7 +608,7 @@ function validate(): string | null {
     return '当前物流账号未配置月结卡号，请改选寄付现结或到付'
   }
   if (form.pickupMode === 'appoint') {
-    const tm = resolveSendStartTm(form.pickupMode, form.appointSlot)
+    const tm = resolveSendStartTm(form.pickupMode, form.appointSlot, appointCascaderOptions.value)
     if (!tm) return '请选择预约上门时间'
   }
   return null
@@ -612,7 +667,11 @@ async function submit(doPrint: boolean) {
     rememberShipPrefs(form.carrierAccountId, form.shipperProfileId)
     const useMonthly = form.payMode === 'monthly'
     const order = buildOrderSnapshot()
-    const sendStartTm = resolveSendStartTm(form.pickupMode, form.appointSlot)
+    const sendStartTm = resolveSendStartTm(
+      form.pickupMode,
+      form.appointSlot,
+      appointCascaderOptions.value,
+    )
     const shipment = await shippingApi.createShipmentFromOrder({
       carrierAccountId: form.carrierAccountId!,
       shipperProfileId: form.shipperProfileId!,

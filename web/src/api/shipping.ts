@@ -262,6 +262,35 @@ export const shippingApi = {
   listShipperProfiles: (params?: Record<string, unknown>) =>
     page<ShipperProfile>('/shipper-profiles', params),
 
+  checkPickupTime: (body: {
+    carrierAccountId: number
+    province?: string
+    city?: string
+    county?: string
+    address?: string
+    cityCode?: string
+  }) =>
+    shippingClient.post('/sf/check-pickup-time', body).then((r) =>
+      unwrap<{
+        startTm: string
+        endTm: string
+        status: boolean
+        exceptionReason?: string
+        cityCode?: string
+        address?: string
+        options: Array<{
+          value: number
+          text: string
+          children: Array<{
+            value: string
+            text: string
+            slotKey: string
+            sendStartTm: string
+          }>
+        }>
+      }>(r),
+    ),
+
   createShipmentFromOrder: (body: CreateShipmentFromOrderInput) =>
     shippingClient.post('/shipments/from-order', body).then((r) => unwrap<Shipment>(r)),
   createShipmentWaybill: (id: number) =>
