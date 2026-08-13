@@ -9,9 +9,8 @@
     <van-loading v-if="loading" class="page-loading" vertical>加载中…</van-loading>
 
     <div class="page-body" v-else>
-      <div v-if="handoffMeta?.orderId" class="banner">
-        已带入订单 #{{ handoffMeta.orderId }}
-        <span v-if="form.sourceTid"> · {{ form.sourceTid }}</span>
+      <div v-if="handoffMeta?.orderId || form.orderNo" class="order-banner">
+        已带入订单中心 {{ form.orderNo || `#${handoffMeta?.orderId}` }}
       </div>
 
       <div class="section-label">寄件人</div>
@@ -57,7 +56,7 @@
         />
       </div>
 
-      <div class="section-label">物流产品</div>
+      <div class="section-label">物流信息</div>
       <div class="card pick-card">
         <button type="button" class="pick-row" @click="showCarrier = true">
           <div class="pick-row__badge carrier">账</div>
@@ -67,37 +66,82 @@
             <div v-if="carrierView" class="muted pick-row__sub">
               {{ carrierView.carrierCode || 'SF' }}
               <template v-if="carrierView.custId"> · 月结 {{ carrierView.custId }}</template>
-              <template v-else> · 现结</template>
+              <template v-else> · 现结可用</template>
             </div>
             <div v-else class="muted">点击选择物流账号</div>
           </div>
           <span class="pick-row__arrow">›</span>
         </button>
-        <van-cell title="产品">
-          <template #value>
-            <van-radio-group v-model="form.expressType" direction="horizontal" class="radio-row">
-              <van-radio name="2">标快</van-radio>
-              <van-radio name="1">特快</van-radio>
-            </van-radio-group>
+
+        <div class="field-block">
+          <div class="field-label">付款方式</div>
+          <van-radio-group v-model="form.payMode" direction="horizontal" class="radio-row radio-row--pay">
+            <van-radio name="monthly" :disabled="!carrierView?.custId">寄付月结</van-radio>
+            <van-radio name="cash">寄付现结</van-radio>
+            <van-radio name="receiver">到付</van-radio>
+          </van-radio-group>
+        </div>
+
+        <div class="field-block">
+          <div class="field-label">寄件方式</div>
+          <div class="pickup-mode">
+            <button
+              type="button"
+              class="pickup-btn"
+              :class="{ active: form.pickupMode === 'self' }"
+              @click="setPickupMode('self')"
+            >
+              自行联系快递员
+            </button>
+            <button
+              type="button"
+              class="pickup-btn"
+              :class="{ active: form.pickupMode === 'appoint' }"
+              @click="setPickupMode('appoint')"
+            >
+              预约寄件
+            </button>
+          </div>
+          <button
+            v-if="form.pickupMode === 'appoint'"
+            type="button"
+            class="appoint-trigger"
+            @click="showAppoint = true"
+          >
+            <span :class="{ muted: !appointLabel }">{{ appointLabel || '请选择预约上门时间' }}</span>
+            <span class="pick-row__arrow">›</span>
+          </button>
+          <div v-if="form.pickupMode === 'appoint'" class="pickup-tip">
+            将通知快递员按所选时段上门揽收
+            <span v-if="sendStartTmPreview">（{{ sendStartTmPreview }} 起）</span>
+          </div>
+        </div>
+
+        <div class="product-reco-hd">
+          物流产品推荐
+          <span class="product-hint">点击切换，与下方当前选择同步</span>
+        </div>
+        <div class="product-cards">
+          <button
+            v-for="p in expressProducts"
+            :key="p.value"
+            type="button"
+            class="product-card"
+            :class="{ active: form.expressType === p.value }"
+            @click="form.expressType = p.value"
+          >
+            <span v-if="p.tag" class="ptag">{{ p.tag }}</span>
+            <div class="pname">{{ p.name }}</div>
+            <div class="phint">{{ p.hint }}</div>
+            <span v-if="form.expressType === p.value" class="check">✓</span>
+          </button>
+        </div>
+        <div class="product-current muted">
+          当前选择：{{ selectedProduct.name }}
+          <template v-if="form.payMode === 'monthly' && carrierView?.custId">
+            · 月结卡号 {{ carrierView.custId }}
           </template>
-        </van-cell>
-        <van-cell title="付款" class="pay-cell">
-          <template #value>
-            <van-radio-group v-model="form.payMode" direction="horizontal" class="radio-row radio-row--pay">
-              <van-radio name="monthly" :disabled="!carrierView?.custId">月结</van-radio>
-              <van-radio name="cash">现结</van-radio>
-              <van-radio name="receiver">到付</van-radio>
-            </van-radio-group>
-          </template>
-        </van-cell>
-        <van-cell title="取件">
-          <template #value>
-            <van-radio-group v-model="form.pickupMode" direction="horizontal" class="radio-row">
-              <van-radio name="self">自行联系</van-radio>
-              <van-radio name="appoint">预约上门</van-radio>
-            </van-radio-group>
-          </template>
-        </van-cell>
+        </div>
       </div>
 
       <div class="section-label">托寄物</div>
@@ -121,7 +165,7 @@
           type="textarea"
           rows="2"
           autosize
-          placeholder="运单备注（选填）"
+          placeholder="运单备注（选填，显示在面单/清单）"
         />
         <div class="muted pad">打印机：{{ printerName || '未选择（请到打印机管理配置）' }}</div>
       </div>
@@ -172,6 +216,7 @@
         <div v-if="!carriers.length" class="muted pad">暂无可用物流账号</div>
       </div>
     </van-popup>
+
     <van-popup v-model:show="showShipper" position="bottom" round>
       <div class="sheet">
         <div class="sheet-title">选择寄件人</div>
@@ -195,6 +240,16 @@
         <div v-if="!shippers.length" class="muted pad">暂无寄件人档案</div>
       </div>
     </van-popup>
+
+    <van-popup v-model:show="showAppoint" position="bottom" round>
+      <van-cascader
+        v-model="appointCascaderValue"
+        title="预约上门时间"
+        :options="appointCascaderOptions"
+        @close="showAppoint = false"
+        @finish="onAppointFinish"
+      />
+    </van-popup>
   </div>
 </template>
 
@@ -209,6 +264,15 @@ import {
   type ShipperProfile,
 } from '../api/shipping'
 import {
+  appointSlotLabel,
+  buildAppointCascaderOptions,
+  decodeAppointLeaf,
+  defaultAppointSlot,
+  encodeAppointLeaf,
+  resolveSendStartTm,
+  type AppointOption,
+} from '../utils/sfAppointTime'
+import {
   consumeSFOrderHandoff,
   goodsCargoName,
   readLastCarrierId,
@@ -221,6 +285,11 @@ import { getSavedPrinterIndex, getSavedPrinterName } from '../utils/sfPrintPlugi
 
 const router = useRouter()
 const EXPRESS_TYPE_KEY = 'shippingcore.sf.expressType'
+
+const expressProducts = [
+  { value: '1', name: '顺丰特快', tag: '时效最优', hint: '时效更快，适合急件' },
+  { value: '2', name: '顺丰标快', tag: '经济实惠', hint: '常规时效，性价比高' },
+] as const
 
 type PayMode = 'monthly' | 'cash' | 'receiver'
 type CargoLine = {
@@ -258,14 +327,21 @@ const preferredShipperId = ref<number | undefined>()
 const result = ref<{ shipmentId: number; mailNo: string; cancelled?: boolean } | null>(null)
 const showCarrier = ref(false)
 const showShipper = ref(false)
+const showAppoint = ref(false)
+const appointCascaderOptions = ref<AppointOption[]>(buildAppointCascaderOptions())
+/** Vant Cascader 选中叶子 value（时段 key） */
+const appointCascaderValue = ref<string | number>('')
 
 const form = reactive({
+  orderNo: '',
   carrierAccountId: undefined as number | undefined,
   shipperProfileId: undefined as number | undefined,
   payMode: 'monthly' as PayMode,
   expressType: (localStorage.getItem(EXPRESS_TYPE_KEY) === '1' ? '1' : '2') as string,
   cargoLines: [emptyCargoLine('商品')] as CargoLine[],
   pickupMode: 'self' as 'self' | 'appoint',
+  /** [dayOffset, slotKey] 对齐电脑版 */
+  appointSlot: [] as Array<number | string>,
   remark: '',
   receiverName: '',
   receiverMobile: '',
@@ -284,8 +360,15 @@ const form = reactive({
 
 const shipperView = computed(() => shippers.value.find((s) => s.id === form.shipperProfileId) || null)
 const carrierView = computed(() => carriers.value.find((c) => c.id === form.carrierAccountId) || null)
+const selectedProduct = computed(
+  () => expressProducts.find((p) => p.value === form.expressType) || expressProducts[1],
+)
 const printerName = computed(
   () => getSavedPrinterName() || (getSavedPrinterIndex() != null ? `索引 ${getSavedPrinterIndex()}` : ''),
+)
+const appointLabel = computed(() => appointSlotLabel(appointCascaderOptions.value, form.appointSlot))
+const sendStartTmPreview = computed(() =>
+  resolveSendStartTm(form.pickupMode, form.appointSlot),
 )
 
 const namedCargoLines = computed(() => form.cargoLines.filter((l) => (l.name || '').trim()))
@@ -325,6 +408,41 @@ watch(
   },
 )
 
+watch(showAppoint, (open) => {
+  if (open) {
+    appointCascaderOptions.value = buildAppointCascaderOptions()
+    const [day, slot] = form.appointSlot
+    appointCascaderValue.value =
+      day !== undefined && day !== null && slot != null
+        ? encodeAppointLeaf(Number(day), String(slot))
+        : ''
+  }
+})
+
+function setPickupMode(mode: 'self' | 'appoint') {
+  form.pickupMode = mode
+  if (mode === 'self') {
+    form.appointSlot = []
+    appointCascaderValue.value = ''
+  } else if (!form.appointSlot.length) {
+    appointCascaderOptions.value = buildAppointCascaderOptions()
+    const def = defaultAppointSlot(appointCascaderOptions.value)
+    form.appointSlot = [...def]
+    if (def[0] !== undefined && def[1] != null) {
+      appointCascaderValue.value = encodeAppointLeaf(Number(def[0]), String(def[1]))
+    }
+  }
+}
+
+function onAppointFinish({ value }: { value: string | number }) {
+  const decoded = decodeAppointLeaf(value)
+  if (decoded) {
+    form.appointSlot = [...decoded]
+    appointCascaderValue.value = encodeAppointLeaf(decoded[0], decoded[1])
+  }
+  showAppoint.value = false
+}
+
 function addCargoLine() {
   form.cargoLines.push(emptyCargoLine())
 }
@@ -358,6 +476,7 @@ function applyHandoff(h: SFOrderHandoff) {
   preferredCarrierId.value = h.carrierAccountId
   preferredShipperId.value = h.shipperProfileId
   const o = h.order
+  form.orderNo = (o.orderNo || '').trim()
   form.platform = o.platform
   form.shopId = o.shopId
   form.shopName = o.shopName || ''
@@ -395,6 +514,7 @@ function buildOrderSnapshot(): OrderSnapshot {
     shopName: form.shopName,
     sourceChannel: form.sourceChannel,
     manualSourceName: form.manualSourceName,
+    orderNo: form.orderNo || undefined,
     sysTid: form.sysTid,
     sourceTid: form.sourceTid,
     receiverName: form.receiverName.trim(),
@@ -430,7 +550,11 @@ function validate(): string | null {
     if (!(line.itemCount > 0)) return `第 ${i + 1} 行请填写件数`
   }
   if (form.payMode === 'monthly' && !carrierView.value?.custId) {
-    return '当前物流账号未配置月结卡号，请改选现结或到付'
+    return '当前物流账号未配置月结卡号，请改选寄付现结或到付'
+  }
+  if (form.pickupMode === 'appoint') {
+    const tm = resolveSendStartTm(form.pickupMode, form.appointSlot)
+    if (!tm) return '请选择预约上门时间'
   }
   return null
 }
@@ -450,6 +574,7 @@ async function printShipmentLabel(shipmentId: number) {
     shipmentId,
     printChannel: channel,
     printerIndex,
+    carrierAccountId: form.carrierAccountId,
   })
 }
 
@@ -487,6 +612,7 @@ async function submit(doPrint: boolean) {
     rememberShipPrefs(form.carrierAccountId, form.shipperProfileId)
     const useMonthly = form.payMode === 'monthly'
     const order = buildOrderSnapshot()
+    const sendStartTm = resolveSendStartTm(form.pickupMode, form.appointSlot)
     const shipment = await shippingApi.createShipmentFromOrder({
       carrierAccountId: form.carrierAccountId!,
       shipperProfileId: form.shipperProfileId!,
@@ -499,6 +625,7 @@ async function submit(doPrint: boolean) {
       cargoCount: cargoTotals.value.itemCount || 1,
       totalWeight: cargoTotals.value.weight > 0 ? cargoTotals.value.weight : undefined,
       pickupMode: form.pickupMode,
+      sendStartTm,
       orderId: handoffMeta.value?.orderId,
       sourceSystem:
         handoffMeta.value?.sourceSystem || (handoffMeta.value?.orderId ? 'ordercore' : undefined),
@@ -575,13 +702,16 @@ onMounted(async () => {
 .page-loading {
   padding: 48px 0;
 }
-.banner {
-  margin-bottom: 10px;
+.order-banner {
+  margin-bottom: 12px;
   padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--ops-primary-soft);
+  border-radius: 8px;
+  background: #fff7e6;
+  border: 1px solid #ffe58f;
   font-size: 13px;
-  color: var(--ops-primary);
+  color: #613400;
+  font-weight: 550;
+  word-break: break-all;
 }
 .pad {
   padding: 0 16px 12px;
@@ -589,7 +719,7 @@ onMounted(async () => {
   line-height: 1.4;
 }
 .pick-card {
-  padding: 4px 0;
+  padding: 4px 0 12px;
 }
 .pick-row {
   display: flex;
@@ -618,7 +748,7 @@ onMounted(async () => {
   margin-top: 2px;
 }
 .pick-row__badge.ship {
-  background: #2563eb;
+  background: #c8161d;
 }
 .pick-row__badge.carrier {
   background: #0f766e;
@@ -663,6 +793,133 @@ onMounted(async () => {
   background: var(--ops-primary-soft);
   padding: 1px 6px;
   border-radius: 999px;
+}
+.field-block {
+  padding: 10px 16px 4px;
+  border-top: 1px solid var(--ops-line);
+}
+.field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ops-ink);
+  margin-bottom: 8px;
+}
+.pickup-mode {
+  display: flex;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.pickup-btn {
+  flex: 1;
+  border: 0;
+  background: #fff;
+  padding: 10px 6px;
+  font-size: 13px;
+  color: #606266;
+  cursor: pointer;
+}
+.pickup-btn + .pickup-btn {
+  border-left: 1px solid #e4e7ec;
+}
+.pickup-btn.active {
+  background: #fff5f5;
+  color: #c8161d;
+  font-weight: 650;
+}
+.appoint-trigger {
+  margin-top: 8px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  border: 1px solid #dcdfe6;
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pickup-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+}
+.product-reco-hd {
+  margin: 12px 16px 8px;
+  font-size: 14px;
+  font-weight: 650;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+.product-hint {
+  font-size: 12px;
+  color: #a8abb2;
+  font-weight: 400;
+}
+.product-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 0 16px;
+}
+.product-card {
+  position: relative;
+  text-align: left;
+  border: 1px solid #dcdfe6;
+  background: #fff;
+  border-radius: 8px;
+  padding: 14px 12px 12px;
+  cursor: pointer;
+  overflow: hidden;
+}
+.product-card.active {
+  border-color: #c8161d;
+  background: #fff5f5;
+  box-shadow: 0 0 0 1px #c8161d inset;
+}
+.ptag {
+  display: inline-block;
+  font-size: 11px;
+  color: #c8161d;
+  background: #fff1f0;
+  border-radius: 2px;
+  padding: 1px 6px;
+  margin-bottom: 6px;
+}
+.pname {
+  font-weight: 700;
+  font-size: 15px;
+  color: #303133;
+}
+.phint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.4;
+}
+.product-current {
+  margin: 10px 16px 0;
+  font-size: 12px;
+}
+.check {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #c8161d;
+  color: #fff;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .sheet {
   padding: 16px 16px calc(16px + var(--ops-safe-bottom));
@@ -732,34 +989,18 @@ onMounted(async () => {
   padding: 12px 0 calc(12px + var(--ops-safe-bottom));
   background: linear-gradient(180deg, transparent, var(--ops-bg) 28%);
 }
-:deep(.van-radio-group) {
-  justify-content: flex-end;
-  flex-wrap: nowrap;
-  gap: 8px;
-}
-:deep(.van-cell__value) {
-  flex: 2;
-  overflow: visible;
-}
 .radio-row {
   display: flex !important;
-  flex-wrap: nowrap !important;
+  flex-wrap: wrap !important;
   align-items: center;
-  justify-content: flex-end;
+  gap: 10px;
   width: 100%;
 }
 .radio-row--pay {
-  gap: 6px !important;
+  gap: 8px !important;
 }
-.pay-cell :deep(.van-cell__title) {
-  flex: none;
-  max-width: 48px;
-}
-.pay-cell :deep(.van-radio__label) {
+.radio-row--pay :deep(.van-radio__label) {
   margin-left: 4px;
   font-size: 13px;
-}
-.pay-cell :deep(.van-radio) {
-  margin-right: 0 !important;
 }
 </style>

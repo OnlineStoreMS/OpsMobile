@@ -34,6 +34,32 @@
         </div>
       </div>
 
+      <div class="section-label">面单</div>
+      <div class="card label-card">
+        <template v-if="detail.labelPdfUrl">
+          <div v-if="labelLoading" class="muted label-tip">面单图片加载中…</div>
+          <div v-else-if="labelError" class="label-tip">
+            <div class="tip tip--warn">{{ labelError }}</div>
+            <van-button size="small" plain hairline type="primary" block @click="openLabelPdf">打开 PDF</van-button>
+          </div>
+          <template v-else-if="labelPng">
+            <van-image
+              :src="labelPng"
+              fit="contain"
+              width="100%"
+              class="label-img"
+              @click="previewLabel"
+            />
+            <div class="label-actions">
+              <van-button size="small" type="primary" block :loading="saving" @click="saveLabelPng">保存图片</van-button>
+              <van-button size="small" plain hairline type="primary" block @click="copyLabelLink">复制链接</van-button>
+            </div>
+            <div class="muted label-tip">点击放大；长按图片也可保存后发给顾客</div>
+          </template>
+        </template>
+        <div v-else class="muted label-tip">打印后自动存档面单，请稍后下拉刷新</div>
+      </div>
+
       <div class="section-label">物流账号</div>
       <div class="card">
         <button type="button" class="pick-row" @click="showCarrier = true">
@@ -132,11 +158,23 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showConfirmDialog, showFailToast, showLoadingToast, showSuccessToast, closeToast } from 'vant'
+import {
+  showConfirmDialog,
+  showFailToast,
+  showImagePreview,
+  showLoadingToast,
+  showSuccessToast,
+  closeToast,
+} from 'vant'
 import { getShipment, shippingApi, type CarrierAccount, type Shipment } from '../api/shipping'
 import { printShipmentByChannel } from '../utils/sfPrintLabel'
 import { getSavedPrinterIndex, getSavedPrinterName } from '../utils/sfPrintPlugin'
 import { formatOrderSource, formatTime } from '../utils/labels'
+import {
+  copyText,
+  downloadDataUrl,
+  renderLabelPdfToPng,
+} from '../utils/labelPdfPreview'
 
 const route = useRoute()
 const router = useRouter()
@@ -147,6 +185,10 @@ const showCarrier = ref(false)
 const loading = ref(true)
 const printing = ref(false)
 const cancelling = ref(false)
+const labelLoading = ref(false)
+const labelPng = ref('')
+const labelError = ref('')
+const saving = ref(false)
 
 const enabledCarriers = computed(() => carriers.value.filter((c) => c.enabled !== false && c.id))
 
@@ -206,6 +248,55 @@ function pickCarrier(id: number) {
   showCarrier.value = false
 }
 
+async function loadLabelPreview(ship: Shipment) {
+  const url = (ship.labelPdfUrl || '').trim()
+  labelPng.value = ''
+  labelError.value = ''
+  if (!url) return
+  labelLoading.value = true
+  try {
+    labelPng.value = await renderLabelPdfToPng(url)
+  } catch (e) {
+    labelError.value = (e as Error).message || '面单渲染失败'
+  } finally {
+    labelLoading.value = false
+  }
+}
+
+function openLabelPdf() {
+  const url = (detail.value?.labelPdfUrl || '').trim()
+  if (!url) return
+  window.open(url, '_blank', 'noopener')
+}
+
+function previewLabel() {
+  if (!labelPng.value) return
+  showImagePreview({ images: [labelPng.value], closeable: true })
+}
+
+function saveLabelPng() {
+  if (!labelPng.value) return
+  saving.value = true
+  try {
+    const no = detail.value?.mailNo || detail.value?.id || 'label'
+    downloadDataUrl(labelPng.value, `面单_${no}.png`)
+    showSuccessToast('已开始下载')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function copyLabelLink() {
+  const url = (detail.value?.labelPdfUrl || '').trim()
+  if (!url) return
+  try {
+    await copyText(url)
+    showSuccessToast('已复制链接')
+  } catch {
+    showFailToast('复制失败')
+  }
+}
+
 function initCarrierSelection(ship: Shipment, list: CarrierAccount[]) {
   const enabled = list.filter((c) => c.enabled !== false && c.id)
   if (ship.carrierAccountId && enabled.some((c) => c.id === ship.carrierAccountId)) {
@@ -258,7 +349,10 @@ async function reprint() {
         : `已发送到 ${getSavedPrinterName() || '打印机'}`,
     )
     detail.value = await getShipment(d.id)
-    if (detail.value) initCarrierSelection(detail.value, carriers.value)
+    if (detail.value) {
+      initCarrierSelection(detail.value, carriers.value)
+      void loadLabelPreview(detail.value)
+    }
   } catch (e) {
     const msg = (e as Error).message || ''
     if (msg === 'PRINTER_NOT_SELECTED') {
@@ -307,6 +401,7 @@ onMounted(async () => {
     detail.value = ship
     carriers.value = cRes.list || []
     initCarrierSelection(ship, carriers.value)
+    void loadLabelPreview(ship)
   } catch (e: any) {
     showFailToast(e.message || '加载失败')
   } finally {
@@ -427,6 +522,27 @@ onMounted(async () => {
 }
 .cancel-btn {
   margin-top: 10px;
+}
+.label-card {
+  padding-bottom: 12px;
+}
+.label-img {
+  display: block;
+  max-height: 360px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.label-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.label-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.4;
 }
 .sheet {
   padding: 16px 16px calc(16px + var(--ops-safe-bottom));
