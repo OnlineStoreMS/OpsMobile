@@ -35,7 +35,7 @@
         <div class="detail-row"><span class="label">平台</span><span class="value">{{ detail.platform || '-' }}</span></div>
         <div class="detail-row"><span class="label">地址</span><span class="value">{{ addrText }}</span></div>
         <div class="detail-row"><span class="label">货物</span><span class="value">{{ detail.cargoName || '-' }}</span></div>
-        <div class="detail-row"><span class="label">发货时间</span><span class="value">{{ formatTime(detail.shippedAt || detail.printedAt || detail.createdAt) }}</span></div>
+        <div class="detail-row"><span class="label">发货时间</span><span class="value">{{ formatTime(detail.shippedAt || (detail.mailNo ? detail.createdAt : '') || '') }}</span></div>
         <div class="detail-row"><span class="label">打印时间</span><span class="value">{{ formatTime(detail.printedAt) || '-' }}</span></div>
         <div class="detail-row">
           <span class="label">打印机</span>

@@ -38,7 +38,7 @@
             <div>来源 <strong>{{ formatOrderSource(row) }}</strong></div>
           </div>
           <div class="order-card__foot">
-            <div class="order-card__time">发货 {{ formatTime(row.shippedAt || row.printedAt || row.createdAt) }}</div>
+            <div class="order-card__time">发货时间 {{ shipTimeText(row) }}</div>
             <div class="order-card__actions" @click.stop>
               <van-button
                 v-if="canReprint(row)"
@@ -145,6 +145,12 @@ function shipStatusLabel(v?: string) {
   if (v === 'pending') return '待发货'
   if (v === 'cancelled') return '已取消'
   return v
+}
+
+/** 卡片底部：取号/确认发货时间，不用打印时间 */
+function shipTimeText(row: Shipment) {
+  const t = row.shippedAt || (row.mailNo ? row.createdAt : '') || ''
+  return formatTime(t)
 }
 
 function canReprint(row: Shipment) {
