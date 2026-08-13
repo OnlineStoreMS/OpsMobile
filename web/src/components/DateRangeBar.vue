@@ -156,8 +156,9 @@ function onConfirm(dates: Date | Date[]) {
   display: flex;
   flex-wrap: nowrap;
   gap: 8px;
-  padding: 0 12px 10px;
+  padding: 4px 12px 12px;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -167,19 +168,22 @@ function onConfirm(dates: Date | Date[]) {
 .date-chip {
   flex: 0 0 auto;
   border: 1px solid rgba(15, 31, 42, 0.1);
-  background: rgba(255, 255, 255, 0.78);
+  background: #fff;
   color: var(--ops-muted);
   font-size: 12px;
   font-weight: 600;
   padding: 6px 12px;
   border-radius: 999px;
   line-height: 1.2;
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow: none;
 }
 .date-chip--on {
-  color: #fff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #0f766e, #14b8a6);
-  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
+  color: var(--ops-primary);
+  border-color: rgba(15, 118, 110, 0.35);
+  background: var(--ops-primary-soft);
+  box-shadow: none;
 }
 .date-chip--custom {
   letter-spacing: 0.02em;

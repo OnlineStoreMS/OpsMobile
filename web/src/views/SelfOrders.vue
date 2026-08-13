@@ -13,11 +13,13 @@
           <div class="search-action" @click="reload">搜索</div>
         </template>
       </van-search>
-      <template v-if="showDateFilter">
-        <div class="range-hint">创建时间</div>
-        <DateRangeBar :start="rangeStart" :end="rangeEnd" @change="onRangeChange" />
-      </template>
-      <div v-else class="range-hint range-hint--plain">待发货：全部未发完单据（含部分发货）</div>
+      <div class="range-block">
+        <template v-if="showDateFilter">
+          <div class="range-hint">创建时间</div>
+          <DateRangeBar :start="rangeStart" :end="rangeEnd" @change="onRangeChange" />
+        </template>
+        <div v-else class="range-hint range-hint--plain">待发货：全部未发完单据（含部分发货）</div>
+      </div>
 
       <div class="status-bar">
         <button
@@ -28,7 +30,7 @@
           :class="{ 'status-chip--on': activeTab === tab.key }"
           @click="onTabChange(tab.key)"
         >
-          {{ tab.label }}
+          <span class="status-chip__label">{{ tab.label }}</span>
           <span v-if="tab.count != null" class="status-chip__n">{{ tab.count }}</span>
         </button>
       </div>
@@ -339,6 +341,9 @@ onMounted(() => {
   color: var(--ops-muted);
   font-variant-numeric: tabular-nums;
 }
+.range-block {
+  min-height: 44px;
+}
 .range-hint {
   padding: 0 16px 4px;
   font-size: 12px;
@@ -346,7 +351,8 @@ onMounted(() => {
   font-weight: 600;
 }
 .range-hint--plain {
-  padding-bottom: 10px;
+  padding: 8px 16px 12px;
+  line-height: 1.4;
 }
 .search-action {
   color: var(--ops-primary);
@@ -373,10 +379,13 @@ onMounted(() => {
   display: flex;
   flex-wrap: nowrap;
   gap: 8px;
-  padding: 0 12px 12px;
+  /* 上下留白，避免 overflow 裁切圆角/选中态 */
+  padding: 6px 12px 14px;
   overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  overscroll-behavior-x: contain;
 }
 .status-bar::-webkit-scrollbar {
   display: none;
@@ -387,13 +396,20 @@ onMounted(() => {
   align-items: center;
   gap: 5px;
   border: 1px solid rgba(15, 31, 42, 0.1);
-  background: rgba(255, 255, 255, 0.78);
+  background: #fff;
   color: var(--ops-muted);
   font-size: 12px;
   font-weight: 600;
-  padding: 6px 10px 6px 12px;
+  padding: 7px 12px;
   border-radius: 999px;
   line-height: 1.2;
+  -webkit-appearance: none;
+  appearance: none;
+  box-shadow: none;
+  transform: none;
+}
+.status-chip__label {
+  white-space: nowrap;
 }
 .status-chip__n {
   display: inline-flex;
@@ -410,13 +426,13 @@ onMounted(() => {
   color: var(--ops-ink);
 }
 .status-chip--on {
-  color: #fff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #0f766e, #14b8a6);
-  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
+  color: var(--ops-primary);
+  border-color: rgba(15, 118, 110, 0.35);
+  background: var(--ops-primary-soft);
+  box-shadow: none;
 }
 .status-chip--on .status-chip__n {
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
+  background: rgba(15, 118, 110, 0.18);
+  color: var(--ops-primary);
 }
 </style>
