@@ -269,21 +269,29 @@ export const shippingApi = {
   /** 手动/快递助手回填运单号发货（支持勾选部分商品） */
   confirmKdzsShip: (body: ConfirmKdzsShipInput) =>
     shippingClient.post('/shipments/confirm-kdzs-ship', body).then((r) => unwrap<Shipment>(r)),
-  printShipment: (id: number) =>
-    shippingClient.post(`/shipments/${id}/print`).then((r) => unwrap<Shipment>(r)),
+  printShipment: (id: number, body?: { carrierAccountId?: number }) =>
+    shippingClient
+      .post(`/shipments/${id}/print`, body || {})
+      .then((r) => unwrap<Shipment>(r)),
   cancelShipment: (id: number) =>
     shippingClient.post(`/shipments/${id}/cancel`).then((r) => unwrap<Shipment>(r)),
 
   fetchShipmentPrintPluginData: (
     id: number,
-    params?: { templateCode?: string; customTemplateCode?: string },
+    params?: { templateCode?: string; customTemplateCode?: string; carrierAccountId?: number },
   ) =>
     shippingClient
       .get(`/shipments/${id}/print-plugin-data`, { params })
       .then((r) => unwrap<SFPrintPluginData>(r)),
 
-  fetchShipmentLabelFile: async (id: number): Promise<Blob> => {
-    const res = await shippingClient.get(`/shipments/${id}/label`, { responseType: 'blob' })
+  fetchShipmentLabelFile: async (
+    id: number,
+    params?: { carrierAccountId?: number },
+  ): Promise<Blob> => {
+    const res = await shippingClient.get(`/shipments/${id}/label`, {
+      responseType: 'blob',
+      params,
+    })
     const blob = res.data as Blob
     if (!blob || blob.size === 0) {
       throw new Error('面单 PDF 为空')
