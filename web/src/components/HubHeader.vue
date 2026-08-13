@@ -27,7 +27,7 @@ const props = withDefaults(
     title: string
     subtitle?: string
     /** 轻微色调区分大页，结构保持一致 */
-    tone?: 'default' | 'warehouse' | 'teal' | 'slate'
+    tone?: 'default' | 'warehouse' | 'teal' | 'slate' | 'amber' | 'rose'
   }>(),
   { subtitle: '', tone: 'default' },
 )
@@ -85,6 +85,12 @@ onMounted(async () => {
 }
 .hub-header--slate {
   background: linear-gradient(155deg, #0b1f2a, #1e293b 55%, #334155);
+}
+.hub-header--amber {
+  background: linear-gradient(155deg, #0b1f2a, #78350f 55%, #d97706);
+}
+.hub-header--rose {
+  background: linear-gradient(155deg, #0b1f2a, #9f1239 50%, #e11d48);
 }
 
 .hub-header__glow {

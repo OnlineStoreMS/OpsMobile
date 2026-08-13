@@ -170,6 +170,98 @@ const router = createRouter({
       component: () => import('../views/warehouse/OtherDocDetail.vue'),
       meta: { title: '其它出库详情', hideTabbar: true, docType: 'out' },
     },
+
+    // —— 订单中心子页 ——
+    {
+      path: '/order/orders',
+      name: 'OmsOrders',
+      component: () => import('../views/order/OrderList.vue'),
+      meta: { title: '全部订单', hideTabbar: true },
+    },
+    {
+      path: '/order/orders/:id',
+      name: 'OmsOrderDetail',
+      component: () => import('../views/order/OrderDetail.vue'),
+      meta: { title: '订单详情', hideTabbar: true },
+    },
+
+    // —— 供应链子页 ——
+    {
+      path: '/supply/purchase-orders',
+      name: 'SupplyPOs',
+      component: () => import('../views/supply/PurchaseOrderList.vue'),
+      meta: { title: '采购订单', hideTabbar: true },
+    },
+    {
+      path: '/supply/purchase-orders/:id',
+      name: 'SupplyPODetail',
+      component: () => import('../views/supply/PurchaseOrderDetail.vue'),
+      meta: { title: '采购单详情', hideTabbar: true },
+    },
+    {
+      path: '/supply/suppliers',
+      name: 'SupplySuppliers',
+      component: () => import('../views/supply/SupplierList.vue'),
+      meta: { title: '供应商', hideTabbar: true },
+    },
+    {
+      path: '/supply/scan-inbound',
+      name: 'SupplyScanInbound',
+      component: () => import('../views/supply/ScanInbound.vue'),
+      meta: { title: '包裹扫描', hideTabbar: true },
+    },
+    {
+      path: '/supply/package-receives',
+      name: 'SupplyPackageReceives',
+      component: () => import('../views/supply/PackageReceiveList.vue'),
+      meta: { title: '收货记录', hideTabbar: true },
+    },
+    {
+      path: '/supply/inbounds',
+      name: 'SupplyInbounds',
+      component: () => import('../views/supply/InboundList.vue'),
+      meta: { title: '采购入库单', hideTabbar: true },
+    },
+
+    // —— 素材中心子页 ——
+    {
+      path: '/material/materials',
+      name: 'MaterialList',
+      component: () => import('../views/material/MaterialList.vue'),
+      meta: { title: '全部素材', hideTabbar: true },
+    },
+    {
+      path: '/material/materials/:id',
+      name: 'MaterialDetail',
+      component: () => import('../views/material/MaterialDetail.vue'),
+      meta: { title: '素材详情', hideTabbar: true },
+    },
+    {
+      path: '/material/categories',
+      name: 'MaterialCategories',
+      component: () => import('../views/material/CategoryList.vue'),
+      meta: { title: '素材分类', hideTabbar: true },
+    },
+
+    // —— 待办中心子页 ——
+    {
+      path: '/todo/todos',
+      name: 'TodoList',
+      component: () => import('../views/todo/TodoList.vue'),
+      meta: { title: '全部待办', hideTabbar: true },
+    },
+    {
+      path: '/todo/todos/:id',
+      name: 'TodoDetail',
+      component: () => import('../views/todo/TodoDetail.vue'),
+      meta: { title: '待办详情', hideTabbar: true },
+    },
+    {
+      path: '/todo/categories',
+      name: 'TodoCategories',
+      component: () => import('../views/todo/CategoryList.vue'),
+      meta: { title: '待办分类', hideTabbar: true },
+    },
   ],
 })
 

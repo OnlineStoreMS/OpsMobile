@@ -1,6 +1,10 @@
 import type { Component } from 'vue'
 import HomePage from './views/Home.vue'
 import WarehouseHome from './views/warehouse/WarehouseHome.vue'
+import OrderHome from './views/order/OrderHome.vue'
+import SupplyHome from './views/supply/SupplyHome.vue'
+import MaterialHome from './views/material/MaterialHome.vue'
+import TodoHome from './views/todo/TodoHome.vue'
 
 /**
  * OpsMobile 顶层大页（安卓 ViewPager）。
@@ -32,8 +36,34 @@ export const hubPages: HubPageDef[] = [
     short: '仓储',
     component: WarehouseHome,
   },
-  // 例：售后 / 采购 / 报表 … 继续往后加即可
-  // { path: '/aftersales', name: 'AfterSalesHome', title: '售后中心', short: '售后', component: AfterSalesHome },
+  {
+    path: '/order',
+    name: 'OrderHome',
+    title: '订单中心',
+    short: '订单',
+    component: OrderHome,
+  },
+  {
+    path: '/supply',
+    name: 'SupplyHome',
+    title: '供应链中心',
+    short: '供应链',
+    component: SupplyHome,
+  },
+  {
+    path: '/material',
+    name: 'MaterialHome',
+    title: '素材中心',
+    short: '素材',
+    component: MaterialHome,
+  },
+  {
+    path: '/todo',
+    name: 'TodoHome',
+    title: '待办中心',
+    short: '待办',
+    component: TodoHome,
+  },
 ]
 
 export function hubIndexByPath(path: string): number {
