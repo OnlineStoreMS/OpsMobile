@@ -103,16 +103,22 @@ body {
 @keyframes page-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 
 .page-body {
   padding: 12px 14px 8px;
+}
+
+/* sticky 底栏盖住滚动区：底栏在 page-body 外（action-bar）或内（footer-safe）分别留空 */
+.page:has(> .action-bar) .page-body {
+  padding-bottom: calc(96px + var(--ops-safe-bottom));
+}
+.page-body:has(> .footer-safe) > :nth-last-child(2) {
+  padding-bottom: calc(88px + var(--ops-safe-bottom));
 }
 
 .page-body--list {

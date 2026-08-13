@@ -157,30 +157,48 @@
       :actions="sourceActions"
       cancel-text="取消"
       close-on-click-action
+      teleport="body"
       @select="onSourceSelect"
     />
 
-    <van-dialog
+    <!-- 底部面板：避免居中 Dialog 在软键盘弹出时上下跳动 -->
+    <van-popup
       v-model:show="showCreateSource"
-      title="新建订单来源"
-      show-cancel-button
-      :confirm-button-loading="creatingSource"
-      :before-close="beforeCreateSourceClose"
+      position="bottom"
+      round
+      teleport="body"
+      class="sheet-popup"
+      safe-area-inset-bottom
+      :close-on-click-overlay="!creatingSource"
+      @opened="onCreateSourceOpened"
+      @closed="onCreateSourceClosed"
     >
-      <div style="padding: 12px 16px 8px">
+      <div class="sheet create-source-sheet">
+        <div class="sheet-title">新建订单来源</div>
         <van-field
+          ref="createSourceFieldRef"
           v-model="newSourceName"
-          autofocus
           maxlength="64"
+          clearable
           placeholder="名称，如：微信私域 / 线下门店"
+          enterkeyhint="done"
+          @keyup.enter="confirmCreateSource"
         />
+        <div class="create-source-actions">
+          <van-button block round :disabled="creatingSource" @click="showCreateSource = false">取消</van-button>
+          <van-button type="primary" block round :loading="creatingSource" @click="confirmCreateSource">
+            确定
+          </van-button>
+        </div>
       </div>
-    </van-dialog>
+    </van-popup>
 
     <van-popup
       v-model:show="showRecipientPicker"
       position="bottom"
       round
+      teleport="body"
+      class="sheet-popup"
       safe-area-inset-bottom
       :style="{ height: '88%' }"
       @opened="onRecipientPopupOpened"
@@ -329,19 +347,37 @@ function addLine() {
 function onSourceSelect(action: { name: string; id: number }) {
   if (action.id === CREATE_SOURCE_ID) {
     newSourceName.value = ''
-    showCreateSource.value = true
+    // 等 ActionSheet 关闭动画结束再开面板，避免两层遮罩抢位置
+    window.setTimeout(() => {
+      showCreateSource.value = true
+    }, 280)
     return
   }
   manualSourceId.value = action.id
   sourceLabel.value = action.name
 }
 
-async function beforeCreateSourceClose(action: string) {
-  if (action !== 'confirm') return true
+const createSourceFieldRef = ref<{ focus?: () => void } | null>(null)
+
+function onCreateSourceOpened() {
+  nextTick(() => {
+    // 面板定位完成后再聚焦，减少键盘顶起时的跳动
+    window.setTimeout(() => {
+      createSourceFieldRef.value?.focus?.()
+    }, 50)
+  })
+}
+
+function onCreateSourceClosed() {
+  if (!creatingSource.value) newSourceName.value = ''
+}
+
+async function confirmCreateSource() {
+  if (creatingSource.value) return
   const name = newSourceName.value.trim()
   if (!name) {
     showFailToast('请输入来源名称')
-    return false
+    return
   }
   creatingSource.value = true
   try {
@@ -353,11 +389,10 @@ async function beforeCreateSourceClose(action: string) {
     manualSourceId.value = row.id
     sourceLabel.value = row.name
     newSourceName.value = ''
+    showCreateSource.value = false
     showSuccessToast('已新建并选中')
-    return true
   } catch (e: any) {
     showFailToast(e?.message || '新建失败')
-    return false
   } finally {
     creatingSource.value = false
   }
@@ -761,5 +796,20 @@ onUnmounted(() => {
 .recipient-state {
   padding: 40px 0;
   text-align: center;
+}
+.create-source-sheet {
+  max-height: none;
+}
+.create-source-sheet :deep(.van-field) {
+  margin: 4px 0 16px;
+  background: #f4f7f9;
+  border-radius: 12px;
+  padding: 4px 8px;
+}
+.create-source-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding-bottom: 4px;
 }
 </style>
