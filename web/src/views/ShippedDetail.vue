@@ -22,6 +22,14 @@
       <div class="section-label">运单信息</div>
       <div class="card">
         <div class="detail-row"><span class="label">运单号</span><span class="value">{{ detail.mailNo || '-' }}</span></div>
+        <div class="detail-row" v-if="detail.mailNo">
+          <span class="label">预计派送</span>
+          <span class="value">
+            <template v-if="promiseLoading">查询中…</template>
+            <template v-else-if="promiseLabel">{{ promiseLabel }}</template>
+            <template v-else>{{ promiseHint || '-' }}</template>
+          </span>
+        </div>
         <div class="detail-row"><span class="label">来源单</span><span class="value">{{ detail.sourceRef || '-' }}</span></div>
         <div class="detail-row"><span class="label">订单来源</span><span class="value">{{ formatOrderSource(detail) }}</span></div>
         <div class="detail-row"><span class="label">平台</span><span class="value">{{ detail.platform || '-' }}</span></div>
@@ -189,6 +197,9 @@ const labelLoading = ref(false)
 const labelPng = ref('')
 const labelError = ref('')
 const saving = ref(false)
+const promiseLabel = ref('')
+const promiseHint = ref('')
+const promiseLoading = ref(false)
 
 const enabledCarriers = computed(() => carriers.value.filter((c) => c.enabled !== false && c.id))
 
@@ -390,6 +401,22 @@ async function cancelWaybill() {
   }
 }
 
+async function loadPromiseTm(ship: Shipment) {
+  promiseLabel.value = ''
+  promiseHint.value = ''
+  if (!ship.mailNo?.trim()) return
+  promiseLoading.value = true
+  try {
+    const res = await shippingApi.searchPromiseTm(ship.id)
+    promiseLabel.value = res.promiseLabel || ''
+    promiseHint.value = res.hint || ''
+  } catch (e: any) {
+    promiseHint.value = e?.message || '预计派送时间查询失败'
+  } finally {
+    promiseLoading.value = false
+  }
+}
+
 onMounted(async () => {
   const id = Number(route.params.id)
   showLoadingToast({ message: '加载中…', forbidClick: true, duration: 0 })
@@ -402,6 +429,7 @@ onMounted(async () => {
     carriers.value = cRes.list || []
     initCarrierSelection(ship, carriers.value)
     void loadLabelPreview(ship)
+    void loadPromiseTm(ship)
   } catch (e: any) {
     showFailToast(e.message || '加载失败')
   } finally {

@@ -328,6 +328,16 @@ export const shippingApi = {
   /** 手动/快递助手回填运单号发货（支持勾选部分商品） */
   confirmKdzsShip: (body: ConfirmKdzsShipInput) =>
     shippingClient.post('/shipments/confirm-kdzs-ship', body).then((r) => unwrap<Shipment>(r)),
+  /** 出单后预计派送时间 EXP_RECE_SEARCH_PROMITM */
+  searchPromiseTm: (id: number) =>
+    shippingClient.get(`/shipments/${id}/promise-tm`).then((r) =>
+      unwrap<{
+        mailNo: string
+        promiseTm?: string
+        promiseLabel?: string
+        hint?: string
+      }>(r),
+    ),
   printShipment: (id: number, body?: { carrierAccountId?: number }) =>
     shippingClient
       .post(`/shipments/${id}/print`, body || {})

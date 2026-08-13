@@ -285,6 +285,7 @@ import {
 import {
   consumeSFOrderHandoff,
   goodsCargoName,
+  parseChineseRegion,
   readLastCarrierId,
   readLastShipperId,
   rememberShipPrefs,
@@ -401,18 +402,38 @@ function scheduleRefreshDeliverQuote() {
   }, 400)
 }
 
+function ensureReceiverRegion() {
+  if (form.receiverProvince?.trim() && form.receiverCity?.trim()) return
+  const raw = [form.receiverProvince, form.receiverCity, form.receiverCounty, form.receiverAddress]
+    .filter(Boolean)
+    .join('')
+  if (!raw.trim()) return
+  const parsed = parseChineseRegion(raw)
+  if (!form.receiverProvince?.trim() && parsed.province) form.receiverProvince = parsed.province
+  if (!form.receiverCity?.trim() && parsed.city) form.receiverCity = parsed.city
+  if (!form.receiverCounty?.trim() && parsed.county) form.receiverCounty = parsed.county
+  if (parsed.address && (!form.receiverAddress?.trim() || form.receiverAddress === raw)) {
+    form.receiverAddress = parsed.address
+  }
+}
+
 async function refreshDeliverQuote() {
+  ensureReceiverRegion()
   const carrierId = form.carrierAccountId
   const shipper = shipperView.value
-  if (
-    !carrierId ||
-    !shipper ||
-    !form.receiverProvince ||
-    !form.receiverCity ||
-    !form.receiverAddress
-  ) {
+  if (!carrierId || !shipper) {
     expressProducts.value = [...DEFAULT_EXPRESS_PRODUCTS]
     quoteError.value = ''
+    return
+  }
+  if (!shipper.province?.trim() || !shipper.city?.trim() || !shipper.address?.trim()) {
+    expressProducts.value = [...DEFAULT_EXPRESS_PRODUCTS]
+    quoteError.value = '寄件人档案缺少省市区/详细地址，无法查询时效与运费'
+    return
+  }
+  if (!form.receiverProvince?.trim() || !form.receiverCity?.trim() || !form.receiverAddress?.trim()) {
+    expressProducts.value = [...DEFAULT_EXPRESS_PRODUCTS]
+    quoteError.value = '请完善收件省、市与详细地址后查询时效与运费'
     return
   }
   quoteLoading.value = true
@@ -435,7 +456,6 @@ async function refreshDeliverQuote() {
         form.appointSlot,
         appointCascaderOptions.value,
       ),
-      businessType: form.expressType,
     })
     const list = (res.products || []).map((p) => ({
       value: String(p.value),
@@ -446,6 +466,9 @@ async function refreshDeliverQuote() {
       deliverLabel: p.deliverLabel,
     }))
     expressProducts.value = list.length ? list : [...DEFAULT_EXPRESS_PRODUCTS]
+    if (!list.some((p) => p.fee || p.deliverLabel)) {
+      quoteError.value = '未返回时效/运费，请确认丰桥已开通 EXP_RECE_QUERY_DELIVERTM'
+    }
     if (!expressProducts.value.some((p) => p.value === form.expressType)) {
       form.expressType = expressProducts.value[0]?.value || '2'
     }
@@ -465,12 +488,14 @@ watch(
     [
       form.carrierAccountId,
       form.shipperProfileId,
+      shipperView.value?.province,
+      shipperView.value?.city,
+      shipperView.value?.address,
       form.receiverProvince,
       form.receiverCity,
       form.receiverCounty,
       form.receiverAddress,
       form.payMode,
-      form.expressType,
       form.pickupMode,
       form.appointSlot.join('|'),
       cargoTotals.value.weight,
@@ -654,6 +679,7 @@ function applyHandoff(h: SFOrderHandoff) {
   form.receiverCity = o.receiverCity
   form.receiverCounty = o.receiverCounty
   form.receiverAddress = o.receiverAddress
+  ensureReceiverRegion()
   const lines = (o.goods || [])
     .map((g) => {
       const name = (g.skuName || g.title || '').trim()
@@ -853,6 +879,7 @@ onMounted(async () => {
     if (handoff?.order) applyHandoff(handoff)
     else showFailToast('无寄件数据，请从待发货进入')
     await loadOptions()
+    scheduleRefreshDeliverQuote()
   } catch (e) {
     showFailToast((e as Error).message || '加载失败')
   } finally {
