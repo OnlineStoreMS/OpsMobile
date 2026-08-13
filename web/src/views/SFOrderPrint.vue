@@ -203,7 +203,14 @@
       </div>
     </div>
 
-    <van-popup v-model:show="showCarrier" position="bottom" round>
+    <van-popup
+      v-model:show="showCarrier"
+      position="bottom"
+      round
+      teleport="body"
+      class="sheet-popup"
+      safe-area-inset-bottom
+    >
       <div class="sheet">
         <div class="sheet-title">选择物流账号</div>
         <button
@@ -225,7 +232,14 @@
       </div>
     </van-popup>
 
-    <van-popup v-model:show="showShipper" position="bottom" round>
+    <van-popup
+      v-model:show="showShipper"
+      position="bottom"
+      round
+      teleport="body"
+      class="sheet-popup"
+      safe-area-inset-bottom
+    >
       <div class="sheet">
         <div class="sheet-title">选择寄件人</div>
         <button
@@ -249,14 +263,43 @@
       </div>
     </van-popup>
 
-    <van-popup v-model:show="showAppoint" position="bottom" round>
-      <van-cascader
-        v-model="appointCascaderValue"
-        title="预约上门时间"
-        :options="appointCascaderOptions"
-        @close="showAppoint = false"
-        @finish="onAppointFinish"
-      />
+    <van-popup
+      v-model:show="showAppoint"
+      position="bottom"
+      round
+      teleport="body"
+      class="sheet-popup"
+      safe-area-inset-bottom
+    >
+      <div class="sheet sheet--appoint">
+        <div class="sheet-title">预约上门时间</div>
+        <div class="appoint-days">
+          <button
+            v-for="d in appointCascaderOptions"
+            :key="d.value"
+            type="button"
+            class="appoint-day"
+            :class="{ active: appointDayTab === d.value }"
+            @click="appointDayTab = d.value"
+          >
+            {{ d.text }}
+          </button>
+        </div>
+        <div class="appoint-slots">
+          <button
+            v-for="slot in appointDaySlots"
+            :key="slot.value"
+            type="button"
+            class="option-card"
+            :class="{ active: isAppointSlotActive(slot.value) }"
+            @click="pickAppointSlot(slot.value)"
+          >
+            <div class="option-card__title">{{ slot.text }}</div>
+            <div v-if="slot.sendStartTm" class="muted">起 {{ slot.sendStartTm }}</div>
+          </button>
+          <div v-if="!appointDaySlots.length" class="muted pad">该日暂无可约时段</div>
+        </div>
+      </div>
     </van-popup>
 
   </div>
@@ -281,6 +324,7 @@ import {
   mapPickupApiOptions,
   resolveSendStartTm,
   type AppointOption,
+  type AppointOptionChild,
 } from '../utils/sfAppointTime'
 import {
   consumeSFOrderHandoff,
@@ -359,8 +403,8 @@ const showAppoint = ref(false)
 const appointLoading = ref(false)
 const pickupWindow = ref<{ startTm: string; endTm: string } | null>(null)
 const appointCascaderOptions = ref<AppointOption[]>(buildAppointCascaderOptions())
-/** Vant Cascader 选中叶子 value（时段 key） */
-const appointCascaderValue = ref<string | number>('')
+/** 弹层当前选中的日（0今天/1明天/2后天） */
+const appointDayTab = ref(0)
 
 const form = reactive({
   orderNo: '',
@@ -509,6 +553,10 @@ const appointLabel = computed(() => appointSlotLabel(appointCascaderOptions.valu
 const sendStartTmPreview = computed(() =>
   resolveSendStartTm(form.pickupMode, form.appointSlot, appointCascaderOptions.value),
 )
+const appointDaySlots = computed<AppointOptionChild[]>(() => {
+  const day = appointCascaderOptions.value.find((d) => d.value === appointDayTab.value)
+  return day?.children || []
+})
 
 const namedCargoLines = computed(() => form.cargoLines.filter((l) => (l.name || '').trim()))
 
@@ -548,15 +596,15 @@ watch(
 )
 
 watch(showAppoint, (open) => {
-  if (open) {
-    void refreshPickupOptions().then(() => {
-      const [day, slot] = form.appointSlot
-      appointCascaderValue.value =
-        day !== undefined && day !== null && slot != null
-          ? encodeAppointLeaf(Number(day), String(slot))
-          : ''
-    })
-  }
+  if (!open) return
+  void refreshPickupOptions().then(() => {
+    const [day] = form.appointSlot
+    if (day !== undefined && day !== null) {
+      appointDayTab.value = Number(day)
+    } else if (appointCascaderOptions.value[0]) {
+      appointDayTab.value = appointCascaderOptions.value[0].value
+    }
+  })
 })
 
 watch(
@@ -609,26 +657,32 @@ function setPickupMode(mode: 'self' | 'appoint') {
   form.pickupMode = mode
   if (mode === 'self') {
     form.appointSlot = []
-    appointCascaderValue.value = ''
   } else {
     void refreshPickupOptions().then(() => {
       if (!form.appointSlot.length) {
         const def = defaultAppointSlot(appointCascaderOptions.value)
         form.appointSlot = [...def]
-        if (def[0] !== undefined && def[1] != null) {
-          appointCascaderValue.value = encodeAppointLeaf(Number(def[0]), String(def[1]))
-        }
       }
+      const [day] = form.appointSlot
+      appointDayTab.value =
+        day !== undefined && day !== null
+          ? Number(day)
+          : appointCascaderOptions.value[0]?.value ?? 0
     })
   }
 }
 
-function onAppointFinish({ value }: { value: string | number }) {
-  const decoded = decodeAppointLeaf(value)
-  if (decoded) {
-    form.appointSlot = [...decoded]
-    appointCascaderValue.value = encodeAppointLeaf(decoded[0], decoded[1])
-  }
+function isAppointSlotActive(leaf: string) {
+  const [day, slot] = form.appointSlot
+  if (day === undefined || day === null || slot == null) return false
+  return encodeAppointLeaf(Number(day), String(slot)) === leaf
+}
+
+function pickAppointSlot(leaf: string) {
+  const decoded = decodeAppointLeaf(leaf)
+  if (!decoded) return
+  form.appointSlot = [...decoded]
+  appointDayTab.value = decoded[0]
   showAppoint.value = false
 }
 
@@ -1139,10 +1193,45 @@ onMounted(async () => {
   max-height: 70vh;
   overflow: auto;
 }
+.sheet--appoint {
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: calc(12px + var(--ops-safe-bottom));
+}
 .sheet-title {
   font-weight: 700;
   font-size: 16px;
   margin-bottom: 12px;
+}
+.appoint-days {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.appoint-day {
+  flex: 1;
+  border: 1.5px solid var(--ops-line);
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #606266;
+  cursor: pointer;
+}
+.appoint-day.active {
+  border-color: #c8161d;
+  background: #fff5f5;
+  color: #c8161d;
+}
+.appoint-slots {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .option-card {
   display: block;

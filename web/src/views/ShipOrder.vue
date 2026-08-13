@@ -193,7 +193,7 @@
     </div>
     <van-empty v-else-if="!loading" description="未找到订单" />
 
-    <van-popup v-model:show="showCompany" position="bottom" round class="sheet-popup">
+    <van-popup v-model:show="showCompany" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
       <div class="sheet sheet--company">
         <div class="sheet-title">选择物流公司</div>
         <van-search
@@ -217,7 +217,7 @@
         </div>
       </div>
     </van-popup>
-    <van-popup v-model:show="showCarrier" position="bottom" round class="sheet-popup">
+    <van-popup v-model:show="showCarrier" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
       <div class="sheet">
         <div class="sheet-title">选择物流账号</div>
         <button
@@ -238,7 +238,7 @@
         <div v-if="!carriers.length" class="muted pad">暂无可用物流账号</div>
       </div>
     </van-popup>
-    <van-popup v-model:show="showShipper" position="bottom" round class="sheet-popup">
+    <van-popup v-model:show="showShipper" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
       <div class="sheet">
         <div class="sheet-title">选择寄件人</div>
         <button

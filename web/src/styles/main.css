@@ -431,3 +431,107 @@ body {
   background: rgba(5, 150, 105, 0.12);
   color: var(--ops-success);
 }
+
+/* 底部选择弹层：必须 teleport 到 body，样式放全局避免 scoped 失效 */
+.sheet-popup.van-popup {
+  max-width: 100%;
+}
+.sheet-popup .sheet {
+  padding: 16px 16px calc(16px + var(--ops-safe-bottom));
+  max-height: 70vh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #fff;
+  color: var(--ops-text);
+}
+.sheet-popup .sheet--appoint {
+  max-height: 78vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: calc(12px + var(--ops-safe-bottom));
+}
+.sheet-popup .sheet-title {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 12px;
+  color: var(--ops-ink);
+}
+.sheet-popup .option-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  border: 1.5px solid var(--ops-line);
+  background: #fff;
+  color: var(--ops-text);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.sheet-popup .option-card.active {
+  border-color: var(--ops-primary);
+  background: var(--ops-primary-soft);
+}
+.sheet-popup .option-card__title {
+  font-weight: 650;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: var(--ops-ink);
+}
+.sheet-popup .option-card__addr {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.sheet-popup .muted {
+  color: var(--ops-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.sheet-popup .pad {
+  padding: 0 4px 12px;
+}
+.sheet-popup .mini-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ops-primary);
+  background: var(--ops-primary-soft);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.sheet-popup .appoint-days {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.sheet-popup .appoint-day {
+  flex: 1;
+  border: 1.5px solid var(--ops-line);
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #606266;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.sheet-popup .appoint-day.active {
+  border-color: #c8161d;
+  background: #fff5f5;
+  color: #c8161d;
+}
+.sheet-popup .appoint-slots {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}

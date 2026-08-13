@@ -138,7 +138,7 @@
     </div>
     <van-empty v-else-if="!loading" description="未找到运单" />
 
-    <van-popup v-model:show="showCarrier" position="bottom" round class="sheet-popup">
+    <van-popup v-model:show="showCarrier" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
       <div class="sheet">
         <div class="sheet-title">选择物流账号</div>
         <button

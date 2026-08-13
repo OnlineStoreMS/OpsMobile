@@ -71,7 +71,7 @@
       </van-list>
     </div>
 
-    <van-popup v-model:show="showCarrier" position="bottom" round class="sheet-popup">
+    <van-popup v-model:show="showCarrier" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
       <div class="sheet">
         <div class="sheet-title">选择物流账号后打印</div>
         <div class="muted sheet-sub" v-if="pendingRow">
