@@ -1,79 +1,180 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { hubPages } from '../hubPages'
+
+const hubRoutes = hubPages.map((h) => ({
+  path: h.path,
+  name: h.name,
+  component: () => import('../views/HubPlaceholder.vue'),
+  meta: { title: h.title, hub: true },
+}))
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    {
-      path: '/',
-      name: 'Home',
-      component: () => import('../views/Home.vue'),
-      meta: { title: '手机端应用中心' },
-    },
+    ...hubRoutes,
     {
       path: '/manual-create',
       name: 'ManualCreate',
       component: () => import('../views/ManualCreate.vue'),
-      meta: { title: '新建手工单' },
+      meta: { title: '新建手工单', hideTabbar: true },
     },
     {
       path: '/self-orders',
       name: 'SelfOrders',
       component: () => import('../views/SelfOrders.vue'),
-      meta: { title: '自营订单' },
+      meta: { title: '自营订单', hideTabbar: true },
     },
     {
       path: '/self-orders/:id',
       name: 'SelfOrderDetail',
       component: () => import('../views/SelfOrderDetail.vue'),
-      meta: { title: '自营订单详情' },
+      meta: { title: '自营订单详情', hideTabbar: true },
     },
     {
       path: '/pending',
       name: 'PendingOrders',
       component: () => import('../views/PendingOrders.vue'),
-      meta: { title: '待发货' },
+      meta: { title: '待发货', hideTabbar: true },
     },
     {
       path: '/pending/:id',
       name: 'PendingDetail',
       component: () => import('../views/PendingDetail.vue'),
-      meta: { title: '待发货详情' },
+      meta: { title: '待发货详情', hideTabbar: true },
     },
     {
       path: '/shipped',
       name: 'ShippedOrders',
       component: () => import('../views/ShippedOrders.vue'),
-      meta: { title: '已发货' },
+      meta: { title: '已发货', hideTabbar: true },
     },
     {
       path: '/shipped/:id',
       name: 'ShippedDetail',
       component: () => import('../views/ShippedDetail.vue'),
-      meta: { title: '已发货详情' },
+      meta: { title: '已发货详情', hideTabbar: true },
     },
     {
       path: '/ship/:orderId',
       name: 'ShipOrder',
       component: () => import('../views/ShipOrder.vue'),
-      meta: { title: '打单发货' },
+      meta: { title: '打单发货', hideTabbar: true },
     },
     {
       path: '/sf-order',
       name: 'SFOrderPrint',
       component: () => import('../views/SFOrderPrint.vue'),
-      meta: { title: '顺丰标准寄件' },
+      meta: { title: '顺丰标准寄件', hideTabbar: true },
     },
     {
       path: '/printers',
       name: 'PrinterSettings',
       component: () => import('../views/PrinterSettings.vue'),
-      meta: { title: '打印机管理' },
+      meta: { title: '打印机管理', hideTabbar: true },
+    },
+
+    // —— 仓储子页 ——
+    {
+      path: '/warehouse/products',
+      name: 'WhProducts',
+      component: () => import('../views/warehouse/ProductList.vue'),
+      meta: { title: '商品列表', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/products/new',
+      name: 'WhProductNew',
+      component: () => import('../views/warehouse/ProductForm.vue'),
+      meta: { title: '新建商品', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/products/:id',
+      name: 'WhProductEdit',
+      component: () => import('../views/warehouse/ProductForm.vue'),
+      meta: { title: '编辑商品', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/barcode',
+      name: 'WhBarcode',
+      component: () => import('../views/warehouse/BarcodePrint.vue'),
+      meta: { title: '条码打印', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/stock/balances',
+      name: 'WhStockBalances',
+      component: () => import('../views/warehouse/StockBalances.vue'),
+      meta: { title: '库存查询', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/stock/summary',
+      name: 'WhStockSummary',
+      component: () => import('../views/warehouse/StockSummary.vue'),
+      meta: { title: '库存汇总账', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/stock/movements',
+      name: 'WhStockMovements',
+      component: () => import('../views/warehouse/StockMovements.vue'),
+      meta: { title: '库存明细表', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/warehouses',
+      name: 'WhWarehouses',
+      component: () => import('../views/warehouse/WarehouseList.vue'),
+      meta: { title: '仓库设置', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/locations',
+      name: 'WhLocations',
+      component: () => import('../views/warehouse/LocationList.vue'),
+      meta: { title: '库位管理', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/stocktakes',
+      name: 'WhStocktakes',
+      component: () => import('../views/warehouse/StocktakeList.vue'),
+      meta: { title: '盘点单', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/stocktakes/:id',
+      name: 'WhStocktakeDetail',
+      component: () => import('../views/warehouse/StocktakeDetail.vue'),
+      meta: { title: '盘点单详情', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/stocktake-details',
+      name: 'WhStocktakeDetails',
+      component: () => import('../views/warehouse/StocktakeDetailList.vue'),
+      meta: { title: '盘点明细表', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/other-inbounds',
+      name: 'WhOtherInbounds',
+      component: () => import('../views/warehouse/OtherInboundList.vue'),
+      meta: { title: '其它入库单', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/other-inbounds/:id',
+      name: 'WhOtherInDetail',
+      component: () => import('../views/warehouse/OtherDocDetail.vue'),
+      meta: { title: '其它入库详情', hideTabbar: true, docType: 'in' },
+    },
+    {
+      path: '/warehouse/other-outbounds',
+      name: 'WhOtherOutbounds',
+      component: () => import('../views/warehouse/OtherOutboundList.vue'),
+      meta: { title: '其它出库单', hideTabbar: true },
+    },
+    {
+      path: '/warehouse/other-outbounds/:id',
+      name: 'WhOtherOutDetail',
+      component: () => import('../views/warehouse/OtherDocDetail.vue'),
+      meta: { title: '其它出库详情', hideTabbar: true, docType: 'out' },
     },
   ],
 })
 
 router.beforeEach((to) => {
-  document.title = String(to.meta.title || '手机端应用中心')
+  document.title = String(to.meta.title || 'OpsMobile')
   return true
 })
 

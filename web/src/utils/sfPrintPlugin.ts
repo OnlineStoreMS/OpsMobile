@@ -26,6 +26,9 @@ export type LocalPrinter = { index: number; name: string }
 
 const PRINTER_STORAGE_KEY = 'opsmobile.clodop.printerIndex'
 const PRINTER_NAME_STORAGE_KEY = 'opsmobile.clodop.printerName'
+/** 条码标签机（可与面单默认机不同） */
+const BARCODE_PRINTER_INDEX_KEY = 'opsmobile.clodop.barcodePrinterIndex'
+const BARCODE_PRINTER_NAME_KEY = 'opsmobile.clodop.barcodePrinterName'
 /** 局域网 C-Lodop 服务根地址，如 http://192.168.3.10:8000 */
 const SERVICE_BASE_KEY = 'opsmobile.clodop.serviceBase'
 
@@ -143,13 +146,30 @@ type LodopInstance = {
     height: number | string,
     text: string,
   ) => void
+  ADD_PRINT_BARCODE?: (
+    top: number | string,
+    left: number | string,
+    width: number | string,
+    height: number | string,
+    barCodeType: string,
+    barCodeValue: string,
+  ) => void
+  ADD_PRINT_IMAGE?: (
+    top: number | string,
+    left: number | string,
+    width: number | string,
+    height: number | string,
+    imgFile: string,
+  ) => void
   ADD_PRINT_URL?: (top: number | string, left: number | string, width: number | string, height: number | string, url: string) => void
   SET_PRINT_MODE?: (mode: string, value: string | number | boolean) => void
   SET_PRINT_STYLE?: (styleName: string, value: string | number) => void
+  SET_PRINT_STYLEA?: (itemIndex: number | string, styleName: string, value: string | number) => void
   SET_PRINTER_INDEX?: (index: number | string) => void | boolean
   SET_PRINTER_INDEXA?: (indexOrName: number | string) => void | boolean
   GET_PRINTER_COUNT?: () => number
   GET_PRINTER_NAME?: (index: number) => string
+  NewPage?: () => void
   PRINT: () => void | boolean
   PREVIEW: () => void
 }
@@ -355,6 +375,25 @@ export function savePrinterSelection(index: number, name?: string) {
   localStorage.setItem(PRINTER_STORAGE_KEY, String(index))
   if (name != null && name !== '') {
     localStorage.setItem(PRINTER_NAME_STORAGE_KEY, name)
+  }
+}
+
+/** 条码标签上次选用的打印机（与面单默认机分开记） */
+export function getSavedBarcodePrinterIndex(): number | null {
+  const v = localStorage.getItem(BARCODE_PRINTER_INDEX_KEY)
+  if (v === null || v === '') return getSavedPrinterIndex()
+  const n = Number(v)
+  return Number.isFinite(n) ? n : getSavedPrinterIndex()
+}
+
+export function getSavedBarcodePrinterName(): string {
+  return localStorage.getItem(BARCODE_PRINTER_NAME_KEY) || getSavedPrinterName()
+}
+
+export function saveBarcodePrinterSelection(index: number, name?: string) {
+  localStorage.setItem(BARCODE_PRINTER_INDEX_KEY, String(index))
+  if (name != null && name !== '') {
+    localStorage.setItem(BARCODE_PRINTER_NAME_KEY, name)
   }
 }
 
@@ -578,6 +617,71 @@ export async function testPrintLocalPrinter(opts: { printerIndex: number; printe
     throw new Error('本机打印组件不支持测试文本打印')
   }
   LODOP.PRINT()
+  await wait(300)
+}
+
+export type BarcodeLabelItem = { code: string; name?: string }
+
+/**
+ * 用 C-Lodop 打印 SKU 条码标签（Code128）。
+ * 须传入 printerIndex：条码机常与面单机不同，由调用方弹出选择。
+ */
+export async function printBarcodeLabelsWithLodop(
+  labels: BarcodeLabelItem[],
+  opts: { printerIndex: number; preview?: boolean; title?: string },
+) {
+  if (!labels.length) throw new Error('没有可打印的标签')
+  const LODOP = await ensureLocalPrintService()
+  LODOP.PRINT_INIT(opts.title || 'SKU条码标签')
+  applyPrinterIndex(LODOP, opts.printerIndex)
+  try {
+    // 常见条码纸 50×30mm；方向 1=纵向
+    LODOP.SET_PRINT_PAGESIZE(1, '50mm', '30mm', '')
+  } catch {
+    /* ignore */
+  }
+
+  for (let i = 0; i < labels.length; i++) {
+    if (i > 0 && typeof LODOP.NewPage === 'function') {
+      LODOP.NewPage()
+    }
+    const code = String(labels[i].code || '').trim()
+    const name = String(labels[i].name || '').trim()
+    if (!code) continue
+
+    if (typeof LODOP.ADD_PRINT_BARCODE === 'function') {
+      LODOP.ADD_PRINT_BARCODE(2, 2, '46mm', '14mm', '128B', code)
+      try {
+        LODOP.SET_PRINT_STYLEA?.(0, 'ShowBarText', 0)
+      } catch {
+        /* ignore */
+      }
+    } else if (typeof LODOP.ADD_PRINT_TEXT === 'function') {
+      LODOP.SET_PRINT_STYLE?.('FontSize', 14)
+      LODOP.SET_PRINT_STYLE?.('Bold', 1)
+      LODOP.ADD_PRINT_TEXT(4, 2, '46mm', '10mm', code)
+    } else {
+      throw new Error('C-Lodop 不支持条码/文本打印')
+    }
+
+    if (typeof LODOP.ADD_PRINT_TEXT === 'function') {
+      LODOP.SET_PRINT_STYLE?.('FontSize', 9)
+      LODOP.SET_PRINT_STYLE?.('Bold', 1)
+      LODOP.SET_PRINT_STYLE?.('Alignment', 2)
+      LODOP.ADD_PRINT_TEXT(17, 2, '46mm', '5mm', code)
+      if (name) {
+        LODOP.SET_PRINT_STYLE?.('FontSize', 8)
+        LODOP.SET_PRINT_STYLE?.('Bold', 0)
+        LODOP.ADD_PRINT_TEXT(22, 2, '46mm', '6mm', name)
+      }
+    }
+  }
+
+  if (opts.preview) {
+    LODOP.PREVIEW()
+  } else {
+    LODOP.PRINT()
+  }
   await wait(300)
 }
 

@@ -14,7 +14,7 @@ export interface PageData<T> {
   pageSize: number
 }
 
-export type AppApi = 'order' | 'self' | 'shipping'
+export type AppApi = 'order' | 'self' | 'shipping' | 'warehouse'
 
 function apiBase(app: AppApi): string {
   return `/apps/${app}/api/v1/admin`
@@ -61,6 +61,7 @@ function createClient(app: AppApi): AxiosInstance {
 export const orderClient = createClient('order')
 export const selfClient = createClient('self')
 export const shippingClient = createClient('shipping')
+export const warehouseClient = createClient('warehouse')
 
 export function unwrap<T>(res: { data: ApiResponse<T> }): T {
   return res.data.data as T

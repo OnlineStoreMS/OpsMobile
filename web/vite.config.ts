@@ -22,6 +22,11 @@ const proxy: Record<string, object> = {
     changeOrigin: true,
     rewrite: (path: string) => path.replace(/^\/apps\/shipping\/api/, '/api'),
   },
+  '/apps/warehouse/api': {
+    target: 'http://localhost:8095',
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/apps\/warehouse\/api/, '/api'),
+  },
 }
 
 export default defineConfig({

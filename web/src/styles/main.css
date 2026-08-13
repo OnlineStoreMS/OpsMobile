@@ -97,16 +97,54 @@ body {
   min-height: 100vh;
   min-height: 100dvh;
   padding-bottom: calc(20px + var(--ops-safe-bottom));
-  animation: page-in 0.35s ease both;
+  background: transparent;
 }
 
-@keyframes page-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* —— 路由左右滑 / Tab 淡入 —— */
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  will-change: transform;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, rgba(20, 184, 166, 0.18), transparent 55%),
+    radial-gradient(900px 420px at 100% 0%, rgba(217, 119, 6, 0.12), transparent 50%),
+    linear-gradient(180deg, #dfe8ee 0%, var(--ops-bg) 38%, #eef3f6 100%);
+}
+.slide-left-enter-from {
+  transform: translate3d(100%, 0, 0);
+}
+.slide-left-leave-to {
+  transform: translate3d(-22%, 0, 0);
+  opacity: 0.65;
+}
+.slide-right-enter-from {
+  transform: translate3d(-22%, 0, 0);
+  opacity: 0.65;
+}
+.slide-right-leave-to {
+  transform: translate3d(100%, 0, 0);
+}
+.fade-tab-enter-active,
+.fade-tab-leave-active {
+  transition: opacity 0.18s ease;
+}
+.fade-tab-enter-from,
+.fade-tab-leave-to {
+  opacity: 0;
+}
+
+/* —— 大页内容区（头图见 HubHeader） —— */
+.home-body {
+  margin-top: -4px;
 }
 
 .page-body {
@@ -540,4 +578,31 @@ body {
   min-height: 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* 通用筛选 chips（仓储等页复用） */
+.date-chip {
+  flex: 0 0 auto;
+  border: 1px solid rgba(15, 31, 42, 0.1);
+  background: #fff;
+  color: var(--ops-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  line-height: 1.2;
+  white-space: nowrap;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.date-chip--on {
+  border-color: transparent;
+  background: var(--ops-primary);
+  color: #fff;
+}
+
+.nav-link {
+  color: var(--ops-primary);
+  font-weight: 600;
+  font-size: 14px;
 }
