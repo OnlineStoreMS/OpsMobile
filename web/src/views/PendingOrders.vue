@@ -13,7 +13,26 @@
           <div class="search-action" @click="reload">搜索</div>
         </template>
       </van-search>
-      <DateRangeBar :start="rangeStart" :end="rangeEnd" @change="onRangeChange" />
+
+      <div class="status-bar">
+        <button
+          type="button"
+          class="status-chip"
+          :class="{ 'status-chip--on': filter === 'all' }"
+          @click="onFilterChange('all')"
+        >
+          全部待发货
+        </button>
+        <button
+          type="button"
+          class="status-chip"
+          :class="{ 'status-chip--on': filter === 'partial' }"
+          @click="onFilterChange('partial')"
+        >
+          部分发货
+        </button>
+      </div>
+
       <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
         <div
           v-for="(row, idx) in list"
@@ -24,7 +43,10 @@
         >
           <div class="order-card__top">
             <div class="order-card__no">{{ row.orderNo }}</div>
-            <span class="ops-tag ops-tag--warn order-card__tag">
+            <span
+              class="ops-tag order-card__tag"
+              :class="row.shipStatus === 'partial_shipped' ? 'ops-tag--warn' : 'ops-tag--warn'"
+            >
               {{ labelShipStatus(row.shipStatus) || '待发货' }}
             </span>
           </div>
@@ -64,15 +86,13 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
-import DateRangeBar from '../components/DateRangeBar.vue'
 import { listPendingOmsOrders, type OMSOrder } from '../api/shipping'
 import { formatOrderSource, formatSpecLine, formatTime, labelShipStatus } from '../utils/labels'
-import { toApiDateTimeRange, todayDay } from '../utils/dateRange'
 
 const router = useRouter()
 const keyword = ref('')
-const rangeStart = ref(todayDay())
-const rangeEnd = ref(todayDay())
+/** all = 待发货+部分发货；partial = 仅部分发货 */
+const filter = ref<'all' | 'partial'>('all')
 const list = ref<OMSOrder[]>([])
 const loading = ref(false)
 const finished = ref(false)
@@ -106,9 +126,9 @@ function openShip(row: OMSOrder) {
   })
 }
 
-function onRangeChange(payload: { start: string; end: string }) {
-  rangeStart.value = payload.start
-  rangeEnd.value = payload.end
+function onFilterChange(next: 'all' | 'partial') {
+  if (filter.value === next) return
+  filter.value = next
   void reload()
 }
 
@@ -122,12 +142,11 @@ async function reload() {
 async function loadMore() {
   loading.value = true
   try {
-    const { start, end } = toApiDateTimeRange(rangeStart.value, rangeEnd.value)
+    // need_ship = wait_ship + partial_shipped（订单中心工作队列）
+    const shipStatus = filter.value === 'partial' ? 'partial_shipped' : 'need_ship'
     const res = await listPendingOmsOrders({
       keyword: keyword.value.trim() || undefined,
-      shipStatus: 'wait_ship',
-      orderedAtStart: start,
-      orderedAtEnd: end,
+      shipStatus,
       page: page.value,
       pageSize: 20,
     })
@@ -155,6 +174,26 @@ async function loadMore() {
   color: var(--ops-primary);
   font-weight: 600;
   padding: 0 4px;
+}
+.status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 12px 10px;
+}
+.status-chip {
+  border: 1px solid var(--ops-line);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ops-muted);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.status-chip--on {
+  border-color: var(--ops-primary);
+  background: var(--ops-primary-soft);
+  color: var(--ops-primary);
 }
 .receiver-box {
   margin: 2px 0 10px;
@@ -187,13 +226,5 @@ async function loadMore() {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-.order-card__more {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  color: var(--ops-primary);
-  font-size: 12px;
-  font-weight: 600;
 }
 </style>
