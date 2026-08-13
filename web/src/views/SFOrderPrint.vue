@@ -15,19 +15,29 @@
       </div>
 
       <div class="section-label">寄件人</div>
-      <div class="card">
-        <van-field
-          v-model="shipperLabel"
-          is-link
-          readonly
-          label="寄件人"
-          placeholder="选择"
-          @click="showShipper = true"
-        />
-        <div v-if="shipperView" class="muted pad">
-          {{ shipperView.mobile }} ·
-          {{ [shipperView.province, shipperView.city, shipperView.county, shipperView.address].filter(Boolean).join(' ') }}
-        </div>
+      <div class="card pick-card">
+        <button type="button" class="pick-row" @click="showShipper = true">
+          <div class="pick-row__badge ship">寄</div>
+          <div class="pick-row__body">
+            <div class="pick-row__label">寄件人档案</div>
+            <div v-if="shipperView" class="pick-row__title">
+              {{ shipperView.name }}
+              <span v-if="shipperView.isDefault" class="mini-tag">默认</span>
+            </div>
+            <div v-if="shipperView" class="muted pick-row__sub">
+              {{ shipperView.mobile }}
+              ·
+              {{
+                [shipperView.province, shipperView.city, shipperView.county, shipperView.address]
+                  .filter(Boolean)
+                  .join(' ')
+              }}
+            </div>
+            <div v-else class="muted">点击选择寄件人</div>
+            <p v-if="shipperView" class="hint">修改寄件信息请到发货中心「寄件人」档案维护</p>
+          </div>
+          <span class="pick-row__arrow">›</span>
+        </button>
       </div>
 
       <div class="section-label">收件人</div>
@@ -48,14 +58,21 @@
       </div>
 
       <div class="section-label">物流产品</div>
-      <div class="card">
-        <van-field
-          v-model="carrierLabel"
-          is-link
-          readonly
-          label="物流账号"
-          @click="showCarrier = true"
-        />
+      <div class="card pick-card">
+        <button type="button" class="pick-row" @click="showCarrier = true">
+          <div class="pick-row__badge carrier">账</div>
+          <div class="pick-row__body">
+            <div class="pick-row__label">物流账号</div>
+            <div v-if="carrierView" class="pick-row__title">{{ carrierView.name }}</div>
+            <div v-if="carrierView" class="muted pick-row__sub">
+              {{ carrierView.carrierCode || 'SF' }}
+              <template v-if="carrierView.custId"> · 月结 {{ carrierView.custId }}</template>
+              <template v-else> · 现结</template>
+            </div>
+            <div v-else class="muted">点击选择物流账号</div>
+          </div>
+          <span class="pick-row__arrow">›</span>
+        </button>
         <van-cell title="产品">
           <template #value>
             <van-radio-group v-model="form.expressType" direction="horizontal">
@@ -135,10 +152,48 @@
     </div>
 
     <van-popup v-model:show="showCarrier" position="bottom" round>
-      <van-picker :columns="carrierColumns" @confirm="onPickCarrier" @cancel="showCarrier = false" />
+      <div class="sheet">
+        <div class="sheet-title">选择物流账号</div>
+        <button
+          v-for="c in carriers"
+          :key="c.id"
+          type="button"
+          class="option-card"
+          :class="{ active: form.carrierAccountId === c.id }"
+          @click="pickCarrier(c.id!)"
+        >
+          <div class="option-card__title">{{ c.name }}</div>
+          <div class="muted">
+            {{ c.carrierCode || 'SF' }}
+            <template v-if="c.custId"> · 月结 {{ c.custId }}</template>
+            <template v-else> · 现结可用</template>
+          </div>
+        </button>
+        <div v-if="!carriers.length" class="muted pad">暂无可用物流账号</div>
+      </div>
     </van-popup>
     <van-popup v-model:show="showShipper" position="bottom" round>
-      <van-picker :columns="shipperColumns" @confirm="onPickShipper" @cancel="showShipper = false" />
+      <div class="sheet">
+        <div class="sheet-title">选择寄件人</div>
+        <button
+          v-for="s in shippers"
+          :key="s.id"
+          type="button"
+          class="option-card"
+          :class="{ active: form.shipperProfileId === s.id }"
+          @click="pickShipper(s.id!)"
+        >
+          <div class="option-card__title">
+            {{ s.name }}
+            <span v-if="s.isDefault" class="mini-tag">默认</span>
+          </div>
+          <div class="muted">{{ s.mobile }}</div>
+          <div class="muted option-card__addr">
+            {{ [s.province, s.city, s.county, s.address].filter(Boolean).join(' ') }}
+          </div>
+        </button>
+        <div v-if="!shippers.length" class="muted pad">暂无寄件人档案</div>
+      </div>
     </van-popup>
   </div>
 </template>
@@ -156,6 +211,9 @@ import {
 import {
   consumeSFOrderHandoff,
   goodsCargoName,
+  readLastCarrierId,
+  readLastShipperId,
+  rememberShipPrefs,
   type SFOrderHandoff,
 } from '../utils/sfOrderHandoff'
 import { printShipmentByChannel } from '../utils/sfPrintLabel'
@@ -194,7 +252,9 @@ const submitting = ref(false)
 const cancelling = ref(false)
 const carriers = ref<CarrierAccount[]>([])
 const shippers = ref<ShipperProfile[]>([])
-const handoffMeta = ref<Pick<SFOrderHandoff, 'orderId' | 'sourceSystem'> | null>(null)
+const handoffMeta = ref<Pick<SFOrderHandoff, 'orderId' | 'sourceSystem' | 'partialShip'> | null>(null)
+const preferredCarrierId = ref<number | undefined>()
+const preferredShipperId = ref<number | undefined>()
 const result = ref<{ shipmentId: number; mailNo: string; cancelled?: boolean } | null>(null)
 const showCarrier = ref(false)
 const showShipper = ref(false)
@@ -226,20 +286,6 @@ const shipperView = computed(() => shippers.value.find((s) => s.id === form.ship
 const carrierView = computed(() => carriers.value.find((c) => c.id === form.carrierAccountId) || null)
 const printerName = computed(
   () => getSavedPrinterName() || (getSavedPrinterIndex() != null ? `索引 ${getSavedPrinterIndex()}` : ''),
-)
-const carrierLabel = computed(() => {
-  const c = carrierView.value
-  return c ? `${c.name}${c.carrierCode ? ` · ${c.carrierCode}` : ''}` : ''
-})
-const shipperLabel = computed(() => {
-  const s = shipperView.value
-  return s ? `${s.name} ${s.mobile || ''}`.trim() : ''
-})
-const carrierColumns = computed(() =>
-  carriers.value.map((c) => ({ text: `${c.name}`, value: c.id! })),
-)
-const shipperColumns = computed(() =>
-  shippers.value.map((s) => ({ text: `${s.name} ${s.mobile || ''}`.trim(), value: s.id! })),
 )
 
 const namedCargoLines = computed(() => form.cargoLines.filter((l) => (l.name || '').trim()))
@@ -291,20 +337,26 @@ function removeCargoLine(idx: number) {
   form.cargoLines.splice(idx, 1)
 }
 
-function onPickCarrier({ selectedOptions }: { selectedOptions: Array<{ value: number }> }) {
-  const v = selectedOptions[0]?.value
-  if (v != null) form.carrierAccountId = v
+function pickCarrier(id: number) {
+  form.carrierAccountId = id
+  rememberShipPrefs(id, form.shipperProfileId)
   showCarrier.value = false
 }
 
-function onPickShipper({ selectedOptions }: { selectedOptions: Array<{ value: number }> }) {
-  const v = selectedOptions[0]?.value
-  if (v != null) form.shipperProfileId = v
+function pickShipper(id: number) {
+  form.shipperProfileId = id
+  rememberShipPrefs(form.carrierAccountId, id)
   showShipper.value = false
 }
 
 function applyHandoff(h: SFOrderHandoff) {
-  handoffMeta.value = { orderId: h.orderId, sourceSystem: h.sourceSystem }
+  handoffMeta.value = {
+    orderId: h.orderId,
+    sourceSystem: h.sourceSystem,
+    partialShip: h.partialShip,
+  }
+  preferredCarrierId.value = h.carrierAccountId
+  preferredShipperId.value = h.shipperProfileId
   const o = h.order
   form.platform = o.platform
   form.shopId = o.shopId
@@ -432,6 +484,7 @@ async function submit(doPrint: boolean) {
   submitting.value = true
   result.value = null
   try {
+    rememberShipPrefs(form.carrierAccountId, form.shipperProfileId)
     const useMonthly = form.payMode === 'monthly'
     const order = buildOrderSnapshot()
     const shipment = await shippingApi.createShipmentFromOrder({
@@ -453,7 +506,10 @@ async function submit(doPrint: boolean) {
     })
     const waybill = await shippingApi.createShipmentWaybill(shipment.id)
     result.value = { shipmentId: waybill.id, mailNo: waybill.mailNo || '' }
-    showSuccessToast(`下单成功${waybill.mailNo ? `，${waybill.mailNo}` : ''}`)
+    const okMsg = handoffMeta.value?.partialShip
+      ? `部分发货成功${waybill.mailNo ? `，${waybill.mailNo}` : ''}（可回待发货继续发剩余）`
+      : `下单成功${waybill.mailNo ? `，${waybill.mailNo}` : ''}`
+    showSuccessToast(okMsg)
     if (doPrint) {
       try {
         await printShipmentLabel(waybill.id)
@@ -470,6 +526,20 @@ async function submit(doPrint: boolean) {
   }
 }
 
+function resolveDefaults() {
+  const lastC = preferredCarrierId.value || readLastCarrierId()
+  const lastS = preferredShipperId.value || readLastShipperId()
+  const defaultCarrier =
+    carriers.value.find((c) => c.id === lastC) || carriers.value[0]
+  const defaultShipper =
+    shippers.value.find((s) => s.id === lastS) ||
+    shippers.value.find((s) => s.isDefault) ||
+    shippers.value[0]
+  form.carrierAccountId = defaultCarrier?.id
+  form.shipperProfileId = defaultShipper?.id
+  if (defaultCarrier) form.payMode = defaultCarrier.useMonthly && defaultCarrier.custId ? 'monthly' : 'cash'
+}
+
 async function loadOptions() {
   const [cRes, sRes] = await Promise.all([
     shippingApi.listCarrierAccounts({ page: 1, pageSize: 100, enabled: true }),
@@ -479,19 +549,15 @@ async function loadOptions() {
   const sf = all.filter((c) => /sf|顺丰/i.test(`${c.carrierCode || ''}${c.name || ''}`))
   carriers.value = sf.length ? sf : all
   shippers.value = (sRes.list || []).filter((s) => s.enabled !== false)
-  const defaultCarrier = carriers.value[0]
-  const defaultShipper = shippers.value.find((s) => s.isDefault) || shippers.value[0]
-  form.carrierAccountId = defaultCarrier?.id
-  form.shipperProfileId = defaultShipper?.id
-  if (defaultCarrier) form.payMode = defaultCarrier.useMonthly ? 'monthly' : 'cash'
+  resolveDefaults()
 }
 
 onMounted(async () => {
   try {
-    await loadOptions()
     const handoff = consumeSFOrderHandoff()
     if (handoff?.order) applyHandoff(handoff)
     else showFailToast('无寄件数据，请从待发货进入')
+    await loadOptions()
   } catch (e) {
     showFailToast((e as Error).message || '加载失败')
   } finally {
@@ -519,6 +585,120 @@ onMounted(async () => {
 }
 .pad {
   padding: 0 16px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.pick-card {
+  padding: 4px 0;
+}
+.pick-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.pick-row:active {
+  background: rgba(0, 0, 0, 0.03);
+}
+.pick-row__badge {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 2px;
+}
+.pick-row__badge.ship {
+  background: #2563eb;
+}
+.pick-row__badge.carrier {
+  background: #0f766e;
+}
+.pick-row__body {
+  flex: 1;
+  min-width: 0;
+}
+.pick-row__label {
+  font-size: 12px;
+  color: var(--ops-muted);
+  margin-bottom: 2px;
+}
+.pick-row__title {
+  font-weight: 650;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pick-row__sub {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.pick-row__arrow {
+  color: var(--ops-muted);
+  font-size: 20px;
+  line-height: 1;
+  padding-top: 4px;
+}
+.hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--ops-muted);
+  line-height: 1.35;
+}
+.mini-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ops-primary);
+  background: var(--ops-primary-soft);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+.sheet {
+  padding: 16px 16px calc(16px + var(--ops-safe-bottom));
+  max-height: 70vh;
+  overflow: auto;
+}
+.sheet-title {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+.option-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  border: 1.5px solid var(--ops-line);
+  background: #fff;
+  cursor: pointer;
+}
+.option-card.active {
+  border-color: var(--ops-primary);
+  background: var(--ops-primary-soft);
+}
+.option-card__title {
+  font-weight: 650;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.option-card__addr {
+  margin-top: 2px;
   font-size: 12px;
   line-height: 1.4;
 }

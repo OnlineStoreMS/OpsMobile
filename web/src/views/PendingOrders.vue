@@ -83,16 +83,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
 import { listPendingOmsOrders, type OMSOrder } from '../api/shipping'
 import { formatOrderSource, formatSpecLine, formatTime, labelShipStatus } from '../utils/labels'
 
+const route = useRoute()
 const router = useRouter()
 const keyword = ref('')
 /** all = 待发货+部分发货；partial = 仅部分发货 */
-const filter = ref<'all' | 'partial'>('all')
+const filter = ref<'all' | 'partial'>(route.query.tab === 'partial' ? 'partial' : 'all')
 const list = ref<OMSOrder[]>([])
 const loading = ref(false)
 const finished = ref(false)

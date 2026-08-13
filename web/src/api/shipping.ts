@@ -69,6 +69,8 @@ export interface OrderSnapshot {
   shopName?: string
   sourceChannel?: string
   manualSourceName?: string
+  /** 订单中心单号，如 OC… */
+  orderNo?: string
   sysTid: string
   sourceTid: string
   receiverName: string
@@ -164,6 +166,18 @@ export interface OMSOrderItem {
   picUrl?: string
 }
 
+export interface OMSOrderShipmentItem {
+  orderItemId?: number
+  qty?: number
+}
+
+export interface OMSOrderShipment {
+  id?: number
+  expressNo?: string
+  expressCompany?: string
+  items?: OMSOrderShipmentItem[]
+}
+
 export interface OMSOrderAddress {
   name?: string
   phone?: string
@@ -198,6 +212,7 @@ export interface OMSOrder {
   selfOrderNo?: string
   items?: OMSOrderItem[]
   address?: OMSOrderAddress
+  shipments?: OMSOrderShipment[]
 }
 
 export async function listPendingOmsOrders(params: {
