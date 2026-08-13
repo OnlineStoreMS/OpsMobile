@@ -75,15 +75,15 @@
         </button>
         <van-cell title="产品">
           <template #value>
-            <van-radio-group v-model="form.expressType" direction="horizontal">
+            <van-radio-group v-model="form.expressType" direction="horizontal" class="radio-row">
               <van-radio name="2">标快</van-radio>
               <van-radio name="1">特快</van-radio>
             </van-radio-group>
           </template>
         </van-cell>
-        <van-cell title="付款">
+        <van-cell title="付款" class="pay-cell">
           <template #value>
-            <van-radio-group v-model="form.payMode" direction="horizontal">
+            <van-radio-group v-model="form.payMode" direction="horizontal" class="radio-row radio-row--pay">
               <van-radio name="monthly" :disabled="!carrierView?.custId">月结</van-radio>
               <van-radio name="cash">现结</van-radio>
               <van-radio name="receiver">到付</van-radio>
@@ -92,7 +92,7 @@
         </van-cell>
         <van-cell title="取件">
           <template #value>
-            <van-radio-group v-model="form.pickupMode" direction="horizontal">
+            <van-radio-group v-model="form.pickupMode" direction="horizontal" class="radio-row">
               <van-radio name="self">自行联系</van-radio>
               <van-radio name="appoint">预约上门</van-radio>
             </van-radio-group>
@@ -734,7 +734,32 @@ onMounted(async () => {
 }
 :deep(.van-radio-group) {
   justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+:deep(.van-cell__value) {
+  flex: 2;
+  overflow: visible;
+}
+.radio-row {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+}
+.radio-row--pay {
+  gap: 6px !important;
+}
+.pay-cell :deep(.van-cell__title) {
+  flex: none;
+  max-width: 48px;
+}
+.pay-cell :deep(.van-radio__label) {
+  margin-left: 4px;
+  font-size: 13px;
+}
+.pay-cell :deep(.van-radio) {
+  margin-right: 0 !important;
 }
 </style>

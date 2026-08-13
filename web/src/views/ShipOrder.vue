@@ -29,7 +29,7 @@
           <van-checkbox
             :model-value="allSelected"
             :indeterminate="indeterminate"
-            @click.stop="toggleAll"
+            @click.prevent.stop="toggleAll"
           >
             全选
           </van-checkbox>
@@ -38,13 +38,14 @@
           </span>
         </div>
         <van-checkbox-group v-model="selectedIndexes">
-          <label
+          <div
             v-for="row in shipRows"
             :key="row.index"
             class="goods-row"
-            :class="{ 'goods-row--on': selectedIndexes.includes(row.index) }"
+            role="button"
+            @click="toggleItem(row.index)"
           >
-            <van-checkbox :name="row.index" />
+            <van-checkbox :name="row.index" @click.stop />
             <img v-if="row.item.picUrl" :src="row.item.picUrl" alt="" />
             <div class="goods-info">
               <div class="goods-name">{{ row.item.skuSpecs || row.item.productName || '商品' }}</div>
@@ -53,14 +54,20 @@
                 <span v-if="row.shipped > 0"> · 已发 {{ row.shipped }}/{{ row.item.quantity || 0 }}</span>
               </div>
             </div>
-          </label>
+          </div>
         </van-checkbox-group>
         <div v-if="!shipRows.length" class="muted empty-ship">
           {{ (order.items || []).length ? '商品均已发完，无需再发' : '无商品行' }}
         </div>
         <div
+          class="tip tip--warn tip--inline"
+          v-if="shipRows.length && selectedIndexes.length === 0"
+        >
+          请先勾选要发货的商品，否则无法确认发货或进入下一步
+        </div>
+        <div
           class="muted tip tip--inline"
-          v-if="isPartialSelection"
+          v-else-if="isPartialSelection"
         >
           部分发货：仅勾选商品按剩余可发数量写入本次运单，订单将保持「部分发货」直至全部发完
         </div>
@@ -397,6 +404,15 @@ function toggleAll() {
   else selectAllShippable()
 }
 
+function toggleItem(index: number) {
+  const cur = selectedIndexes.value
+  if (cur.includes(index)) {
+    selectedIndexes.value = cur.filter((i) => i !== index)
+  } else {
+    selectedIndexes.value = [...cur, index]
+  }
+}
+
 function buildSnapshot() {
   if (!order.value) return null
   const allowed = new Set(shipRows.value.map((r) => r.index))
@@ -685,7 +701,8 @@ onMounted(async () => {
   try {
     await loadOptions()
     order.value = id ? await loadOrder(id) : null
-    selectAllShippable()
+    // 默认不勾选，需用户主动勾选后才能发货
+    selectedIndexes.value = []
   } catch (e: any) {
     showFailToast(e.message || '加载失败')
   } finally {
@@ -756,13 +773,14 @@ onMounted(async () => {
   padding: 12px 4px;
   border-bottom: 1px solid var(--ops-line);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.goods-row:active {
+  opacity: 0.85;
 }
 .goods-row:last-of-type {
   border-bottom: none;
-}
-.goods-row--on {
-  background: rgba(37, 99, 235, 0.04);
-  border-radius: 10px;
 }
 .goods-row img {
   width: 44px;
@@ -798,6 +816,11 @@ onMounted(async () => {
 }
 .tip--inline {
   padding: 8px 0 0;
+}
+.tip--warn {
+  color: #b45309;
+  font-size: 12px;
+  line-height: 1.45;
 }
 .tip--ok {
   padding: 0 16px 4px;

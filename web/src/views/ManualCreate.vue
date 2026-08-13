@@ -9,7 +9,7 @@
           left-icon="info-o"
           background="rgba(15, 118, 110, 0.1)"
           color="#0f766e"
-          text="提交后自动分配自营；请到电脑「发货中心」打单发货。"
+          text="提交后自动分配自营，不同步快递助手；请用「打单发货」自建物流发货。"
         />
 
         <div class="section-label" style="margin-top: 14px">智能填单</div>
@@ -145,8 +145,9 @@
         <div style="margin-top: 8px; font-weight: 600">建单成功</div>
         <div class="order-no">{{ created.orderNo }}</div>
         <div class="muted">{{ created.tip }}</div>
-        <div class="muted" style="margin-top: 12px">请到电脑打开「发货中心」继续打单发货</div>
-        <van-button type="primary" block style="margin-top: 20px" @click="resetForm">再建一单</van-button>
+        <div class="muted" style="margin-top: 12px">可在本机「待发货 → 打单发货」用自建物流发货</div>
+        <van-button type="primary" block style="margin-top: 20px" @click="goShipCreated">去打单发货</van-button>
+        <van-button block plain style="margin-top: 8px" @click="resetForm">再建一单</van-button>
         <van-button block plain style="margin-top: 8px" @click="router.replace('/')">返回首页</van-button>
       </div>
     </div>
@@ -300,7 +301,7 @@ const form = reactive({
 })
 
 const items = ref<LineItem[]>([emptyLine()])
-const created = ref<{ orderNo: string; tip: string } | null>(null)
+const created = ref<{ orderNo: string; orderId?: number; tip: string } | null>(null)
 
 const sourceActions = computed(() => [
   { name: '＋ 新建来源', id: CREATE_SOURCE_ID, color: '#1a73e8' },
@@ -533,8 +534,10 @@ async function submit() {
       buyerTel: form.buyerTel,
       remark: form.remark,
       saveCustomer: saveCustomer.value,
-      syncKdzs: true,
+      // 手机端默认只走自建物流：本地建单并分配自营，不同步快递助手
+      syncKdzs: false,
       createAction: 'create_and_push',
+      printMode: 'carrier',
       manualSourceId: manualSourceId.value || undefined,
       totalAmount: orderTotal.value,
       payAmount: orderTotal.value,
@@ -551,7 +554,8 @@ async function submit() {
     closeToast()
     created.value = {
       orderNo: order.orderNo,
-      tip: '已创建并分配自营',
+      orderId: order.id,
+      tip: '已创建并分配自营（未同步快递助手）',
     }
   } catch (e: any) {
     closeToast()
@@ -576,6 +580,18 @@ function resetForm() {
   manualSourceId.value = undefined
   sourceLabel.value = ''
   saveCustomer.value = true
+}
+
+function goShipCreated() {
+  const c = created.value
+  if (!c?.orderId) {
+    router.replace('/pending')
+    return
+  }
+  router.replace({
+    path: `/ship/${c.orderId}`,
+    query: c.orderNo ? { no: c.orderNo } : undefined,
+  })
 }
 
 onMounted(loadSources)
