@@ -142,6 +142,7 @@ export interface Shipment {
   receiverAddress: string
   mailNo: string
   status: string
+  errorMessage?: string
   cargoName: string
   printedAt?: string
   createdAt?: string
@@ -287,6 +288,35 @@ export const shippingApi = {
             slotKey: string
             sendStartTm: string
           }>
+        }>
+      }>(r),
+    ),
+
+  queryDeliverTm: (body: {
+    carrierAccountId: number
+    srcProvince?: string
+    srcCity?: string
+    srcCounty?: string
+    srcAddress?: string
+    destProvince?: string
+    destCity?: string
+    destCounty?: string
+    destAddress?: string
+    weightKg?: number
+    useMonthly?: boolean
+    consignedTime?: string
+    businessType?: string
+  }) =>
+    shippingClient.post('/sf/query-deliver-tm', body).then((r) =>
+      unwrap<{
+        products: Array<{
+          value: string
+          name: string
+          tag?: string
+          hint?: string
+          fee?: number
+          deliverTime?: string
+          deliverLabel?: string
         }>
       }>(r),
     ),

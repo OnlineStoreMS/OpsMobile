@@ -121,8 +121,11 @@
 
         <div class="product-reco-hd">
           物流产品推荐
-          <span class="product-hint">点击切换，与下方当前选择同步</span>
+          <span class="product-hint">
+            {{ quoteLoading ? '正在查询时效与运费…' : '点击切换，与下方当前选择同步' }}
+          </span>
         </div>
+        <div v-if="quoteError" class="quote-err">{{ quoteError }}</div>
         <div class="product-cards">
           <button
             v-for="p in expressProducts"
@@ -134,7 +137,9 @@
           >
             <span v-if="p.tag" class="ptag">{{ p.tag }}</span>
             <div class="pname">{{ p.name }}</div>
-            <div class="phint">{{ p.hint }}</div>
+            <div v-if="p.deliverLabel" class="pdeliver">{{ p.deliverLabel }}</div>
+            <div v-else-if="p.hint" class="phint">{{ p.hint }}</div>
+            <div v-if="fmtFee(p.fee)" class="pfee">预估: ¥{{ fmtFee(p.fee) }} 起</div>
             <span v-if="form.expressType === p.value" class="check">✓</span>
           </button>
         </div>
@@ -144,6 +149,7 @@
             · 月结卡号 {{ carrierView.custId }}
           </template>
         </div>
+
       </div>
 
       <div class="section-label">托寄物</div>
@@ -252,6 +258,7 @@
         @finish="onAppointFinish"
       />
     </van-popup>
+
   </div>
 </template>
 
@@ -289,10 +296,27 @@ import { getSavedPrinterIndex, getSavedPrinterName } from '../utils/sfPrintPlugi
 const router = useRouter()
 const EXPRESS_TYPE_KEY = 'shippingcore.sf.expressType'
 
-const expressProducts = [
+type ExpressProductCard = {
+  value: string
+  name: string
+  tag?: string
+  hint?: string
+  fee?: number
+  deliverLabel?: string
+}
+
+const DEFAULT_EXPRESS_PRODUCTS: ExpressProductCard[] = [
   { value: '1', name: '顺丰特快', tag: '时效最优', hint: '时效更快，适合急件' },
   { value: '2', name: '顺丰标快', tag: '经济实惠', hint: '常规时效，性价比高' },
-] as const
+]
+
+const expressProducts = ref<ExpressProductCard[]>([...DEFAULT_EXPRESS_PRODUCTS])
+const quoteLoading = ref(false)
+const quoteError = ref('')
+function fmtFee(fee?: number) {
+  if (fee == null || !(fee > 0)) return ''
+  return Number.isInteger(fee) ? String(fee) : fee.toFixed(2)
+}
 
 type PayMode = 'monthly' | 'cash' | 'receiver'
 type CargoLine = {
@@ -366,7 +390,92 @@ const form = reactive({
 const shipperView = computed(() => shippers.value.find((s) => s.id === form.shipperProfileId) || null)
 const carrierView = computed(() => carriers.value.find((c) => c.id === form.carrierAccountId) || null)
 const selectedProduct = computed(
-  () => expressProducts.find((p) => p.value === form.expressType) || expressProducts[1],
+  () => expressProducts.value.find((p) => p.value === form.expressType) || expressProducts.value[1],
+)
+
+let quoteTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleRefreshDeliverQuote() {
+  if (quoteTimer) clearTimeout(quoteTimer)
+  quoteTimer = setTimeout(() => {
+    void refreshDeliverQuote()
+  }, 400)
+}
+
+async function refreshDeliverQuote() {
+  const carrierId = form.carrierAccountId
+  const shipper = shipperView.value
+  if (
+    !carrierId ||
+    !shipper ||
+    !form.receiverProvince ||
+    !form.receiverCity ||
+    !form.receiverAddress
+  ) {
+    expressProducts.value = [...DEFAULT_EXPRESS_PRODUCTS]
+    quoteError.value = ''
+    return
+  }
+  quoteLoading.value = true
+  quoteError.value = ''
+  try {
+    const res = await shippingApi.queryDeliverTm({
+      carrierAccountId: carrierId,
+      srcProvince: shipper.province,
+      srcCity: shipper.city,
+      srcCounty: shipper.county,
+      srcAddress: shipper.address,
+      destProvince: form.receiverProvince,
+      destCity: form.receiverCity,
+      destCounty: form.receiverCounty,
+      destAddress: form.receiverAddress,
+      weightKg: cargoTotals.value.weight > 0 ? cargoTotals.value.weight : 1,
+      useMonthly: form.payMode === 'monthly',
+      consignedTime: resolveSendStartTm(
+        form.pickupMode,
+        form.appointSlot,
+        appointCascaderOptions.value,
+      ),
+      businessType: form.expressType,
+    })
+    const list = (res.products || []).map((p) => ({
+      value: String(p.value),
+      name: p.name,
+      tag: p.tag,
+      hint: p.hint,
+      fee: p.fee,
+      deliverLabel: p.deliverLabel,
+    }))
+    expressProducts.value = list.length ? list : [...DEFAULT_EXPRESS_PRODUCTS]
+    if (!expressProducts.value.some((p) => p.value === form.expressType)) {
+      form.expressType = expressProducts.value[0]?.value || '2'
+    }
+  } catch (e: unknown) {
+    expressProducts.value = [...DEFAULT_EXPRESS_PRODUCTS]
+    const msg = e instanceof Error ? e.message : String(e || '')
+    quoteError.value = msg.includes('无对应服务权限') || msg.includes('A1004')
+      ? '请在丰桥开通「时效标准及价格查询」(EXP_RECE_QUERY_DELIVERTM) 后重试'
+      : msg || '时效/运费查询失败'
+  } finally {
+    quoteLoading.value = false
+  }
+}
+
+watch(
+  () =>
+    [
+      form.carrierAccountId,
+      form.shipperProfileId,
+      form.receiverProvince,
+      form.receiverCity,
+      form.receiverCounty,
+      form.receiverAddress,
+      form.payMode,
+      form.expressType,
+      form.pickupMode,
+      form.appointSlot.join('|'),
+      cargoTotals.value.weight,
+    ] as const,
+  () => scheduleRefreshDeliverQuote(),
 )
 const printerName = computed(
   () => getSavedPrinterName() || (getSavedPrinterIndex() != null ? `索引 ${getSavedPrinterIndex()}` : ''),
@@ -399,7 +508,7 @@ const cargoTotals = computed(() => {
 watch(
   () => form.expressType,
   (v) => {
-    if (v === '1' || v === '2') localStorage.setItem(EXPRESS_TYPE_KEY, v)
+    if (v) localStorage.setItem(EXPRESS_TYPE_KEY, v)
   },
 )
 
@@ -960,6 +1069,24 @@ onMounted(async () => {
   margin-top: 4px;
   font-size: 12px;
   color: #909399;
+  line-height: 1.4;
+}
+.pdeliver {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.35;
+}
+.pfee {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #c8161d;
+  font-weight: 650;
+}
+.quote-err {
+  margin: 0 16px 8px;
+  font-size: 12px;
+  color: #e6a23c;
   line-height: 1.4;
 }
 .product-current {
