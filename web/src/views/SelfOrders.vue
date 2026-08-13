@@ -69,16 +69,29 @@
           <div class="order-card__foot">
             <div class="order-card__price">¥{{ Number(row.saleAmount || 0).toFixed(2) }}</div>
             <div class="order-card__time">{{ formatTime(row.createdAt || row.orderedAt) }}</div>
-            <van-button
-              v-if="showShipBtn(row)"
-              size="mini"
-              type="primary"
-              round
-              @click.stop="openShip(row)"
-            >
-              打单发货
-            </van-button>
-            <van-icon v-else name="arrow" color="#9aabB6" />
+            <div class="order-card__actions" @click.stop>
+              <van-button
+                v-if="showPayBtn(row)"
+                size="mini"
+                type="primary"
+                plain
+                hairline
+                round
+                @click="openPay(row)"
+              >
+                记录付款
+              </van-button>
+              <van-button
+                v-if="showShipBtn(row)"
+                size="mini"
+                type="primary"
+                round
+                @click="openShip(row)"
+              >
+                打单发货
+              </van-button>
+              <van-icon v-if="!showPayBtn(row) && !showShipBtn(row)" name="arrow" color="#9aabB6" />
+            </div>
           </div>
         </div>
         <van-empty v-if="!loading && !list.length" description="暂无自营订单" />
@@ -183,6 +196,17 @@ function showShipBtn(row: SelfOrderListItem) {
   if (!(row.refSoId && row.refSoId > 0)) return false
   const ship = deriveSelfShipStatus(row.status)
   return ship === 'wait_ship' || ship === 'partial_shipped'
+}
+
+function showPayBtn(row: SelfOrderListItem) {
+  if ((row.sourceChannel || '').toLowerCase() === 'kdzs') return false
+  if (row.status === 'cancelled' || row.status === 'draft') return false
+  const pay = (row.payStatus || 'unpaid').trim()
+  return pay === 'unpaid' || pay === 'partial'
+}
+
+function openPay(row: SelfOrderListItem) {
+  router.push({ path: `/self-orders/${row.id}`, query: { pay: '1' } })
 }
 
 function openShip(row: SelfOrderListItem) {
@@ -334,6 +358,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.order-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .order-card__time {
   margin-left: auto;

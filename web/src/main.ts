@@ -22,10 +22,13 @@ import {
   Tag,
   Toast,
   Dialog,
+  Uploader,
+  ImagePreview,
   showToast,
   showSuccessToast,
   showFailToast,
   showLoadingToast,
+  showImagePreview,
   closeToast,
 } from 'vant'
 import 'vant/lib/index.css'
@@ -65,10 +68,19 @@ async function boot() {
     Tag,
     Toast,
     Dialog,
+    Uploader,
+    ImagePreview,
   ].forEach((c) => app.use(c))
 
   app.config.globalProperties.$toast = showToast
-  app.provide('toast', { showToast, showSuccessToast, showFailToast, showLoadingToast, closeToast })
+  app.provide('toast', {
+    showToast,
+    showSuccessToast,
+    showFailToast,
+    showLoadingToast,
+    showImagePreview,
+    closeToast,
+  })
 
   app.use(router)
   app.mount('#app')

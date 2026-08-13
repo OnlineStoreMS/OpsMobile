@@ -130,3 +130,85 @@ export const SELF_SHIPMENT_STATUS_MAP: Record<string, string> = {
 export async function listSelfShipments(selfOrderId: number) {
   return unwrap<SelfShipment[]>(await selfClient.get(`/self-orders/${selfOrderId}/shipments`))
 }
+
+export interface SelfPayment {
+  id: number
+  selfOrderId: number
+  payAmount: number
+  payMethod?: string
+  payAccount?: string
+  payeeAccount?: string
+  payeeName?: string
+  payStatus: string
+  paidAt?: string
+  remark?: string
+  createdAt: string
+}
+
+export interface SelfAttachment {
+  id: number
+  selfOrderId: number
+  paymentId?: number
+  shipmentId?: number
+  fileType: string
+  fileName: string
+  fileUrl: string
+  remark?: string
+  createdAt: string
+}
+
+export interface SelfPaymentInput {
+  payAmount: number
+  payMethod?: string
+  payAccount?: string
+  payeeAccount?: string
+  payeeName?: string
+  payStatus?: string
+  paidAt?: string
+  remark?: string
+}
+
+export const SELF_PAY_METHOD_MAP: Record<string, string> = {
+  bank: '银行转账',
+  alipay: '支付宝',
+  wechat: '微信',
+  other: '其他',
+}
+
+export async function listSelfPayments(selfOrderId: number) {
+  return unwrap<SelfPayment[]>(await selfClient.get(`/self-orders/${selfOrderId}/payments`))
+}
+
+export async function createSelfPayment(selfOrderId: number, data: SelfPaymentInput) {
+  return unwrap<SelfPayment>(await selfClient.post(`/self-orders/${selfOrderId}/payments`, data))
+}
+
+export async function listSelfAttachments(selfOrderId: number) {
+  return unwrap<SelfAttachment[]>(await selfClient.get(`/self-orders/${selfOrderId}/attachments`))
+}
+
+export async function createSelfAttachment(
+  selfOrderId: number,
+  data: {
+    fileType: string
+    fileName: string
+    fileUrl: string
+    paymentId?: number
+    remark?: string
+  },
+) {
+  return unwrap<SelfAttachment>(await selfClient.post(`/self-orders/${selfOrderId}/attachments`, data))
+}
+
+/** 上传图片到 SelfCore（MinIO/本地），返回可访问 URL */
+export async function uploadSelfImage(file: File, subdir = 'self/payments') {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('subdir', subdir)
+  const res = await selfClient.post('/upload', form, {
+    // 勿手动写 multipart boundary，交给浏览器/axios
+    headers: { 'Content-Type': undefined as unknown as string },
+    timeout: 120000,
+  })
+  return unwrap<{ url: string; fileName: string }>(res)
+}

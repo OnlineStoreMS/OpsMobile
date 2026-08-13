@@ -47,6 +47,44 @@
         <div v-if="!detail.items?.length" class="muted">无商品行</div>
       </div>
 
+      <template v-if="showPaymentSection">
+        <div class="section-label">
+          付款记录
+          <span class="section-label__extra">
+            已付 ¥{{ paidSum.toFixed(2) }} · 待付 ¥{{ remainAmount.toFixed(2) }}
+          </span>
+        </div>
+        <div class="card" v-if="paymentsLoading">
+          <van-loading size="20px">加载付款…</van-loading>
+        </div>
+        <div v-else-if="payments.length" class="pay-list">
+          <div v-for="p in payments" :key="p.id" class="card pay-card">
+            <div class="pay-card__hd">
+              <strong>¥{{ Number(p.payAmount || 0).toFixed(2) }}</strong>
+              <span class="muted">{{ payMethodLabel(p.payMethod) }}</span>
+            </div>
+            <div class="muted pay-card__meta">
+              {{ formatTime(p.paidAt || p.createdAt) }}
+              <template v-if="p.remark"> · {{ p.remark }}</template>
+            </div>
+            <div v-if="screenshotsByPayment.get(p.id)?.length" class="pay-shots">
+              <button
+                v-for="a in screenshotsByPayment.get(p.id)"
+                :key="a.id"
+                type="button"
+                class="pay-shot"
+                @click="previewShots(p.id, a.fileUrl)"
+              >
+                <img :src="a.fileUrl" alt="付款截图" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="card" v-else>
+          <div class="muted empty-ship">暂无付款记录</div>
+        </div>
+      </template>
+
       <div class="section-label">
         发货物流
         <span class="section-label__extra" v-if="shipments.length">{{ shipments.length }} 批</span>
@@ -90,23 +128,104 @@
         <div class="muted empty-ship">暂无发货物流记录</div>
       </div>
 
-      <div class="footer-safe" v-if="canShip">
-        <van-button type="primary" block round @click="goShip">打单发货</van-button>
+      <div class="footer-safe" v-if="canRecordPay || canShip">
+        <van-button v-if="canRecordPay" type="primary" block round plain hairline @click="openPaySheet">
+          记录付款
+        </van-button>
+        <van-button v-if="canShip" type="primary" block round @click="goShip">打单发货</van-button>
       </div>
     </div>
     <van-empty v-else-if="!loading" description="未找到订单" />
+
+    <van-popup
+      v-model:show="showPaySheet"
+      position="bottom"
+      round
+      teleport="body"
+      class="sheet-popup"
+      safe-area-inset-bottom
+      :close-on-click-overlay="!savingPay"
+    >
+      <div class="sheet pay-sheet">
+        <div class="sheet-title">记录付款</div>
+        <div class="muted pay-hint">
+          销售 ¥{{ Number(detail?.saleAmount || 0).toFixed(2) }} · 待付 ¥{{ remainAmount.toFixed(2) }}；
+          累计付清后自动标记已付清
+        </div>
+        <van-field
+          v-model="payForm.payAmountText"
+          type="number"
+          label="付款金额"
+          required
+          placeholder="0.00"
+          input-align="right"
+        />
+        <van-field label="付款方式" required>
+          <template #input>
+            <div class="pay-method-row">
+              <button
+                v-for="m in payMethods"
+                :key="m.value"
+                type="button"
+                class="pay-method-chip"
+                :class="{ active: payForm.payMethod === m.value }"
+                @click="payForm.payMethod = m.value"
+              >
+                {{ m.label }}
+              </button>
+            </div>
+          </template>
+        </van-field>
+        <div class="pay-upload-block">
+          <div class="pay-upload-label">付款截图</div>
+          <van-uploader
+            v-model="shotFiles"
+            multiple
+            :max-count="6"
+            :max-size="8 * 1024 * 1024"
+            accept="image/*"
+            :after-read="onShotAfterRead"
+            @oversize="() => showFailToast('单张图片不能超过 8MB')"
+          />
+          <div class="muted pay-upload-tip">可拍照或从相册选择，建议上传转账截图</div>
+        </div>
+        <van-field v-model="payForm.payAccount" label="打款账号" placeholder="可选" />
+        <van-field v-model="payForm.payeeAccount" label="收款账号" placeholder="可选" />
+        <van-field v-model="payForm.payeeName" label="收款户名" placeholder="可选" />
+        <van-field v-model="payForm.remark" label="备注" placeholder="可选" rows="2" autosize type="textarea" />
+        <div class="pay-sheet-actions">
+          <van-button block round :disabled="savingPay" @click="showPaySheet = false">取消</van-button>
+          <van-button type="primary" block round :loading="savingPay" @click="submitPay">保存</van-button>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showFailToast, showLoadingToast, closeToast } from 'vant'
 import {
+  showFailToast,
+  showLoadingToast,
+  showSuccessToast,
+  showImagePreview,
+  closeToast,
+  type UploaderFileListItem,
+} from 'vant'
+import {
+  createSelfAttachment,
+  createSelfPayment,
   getSelfOrder,
+  listSelfAttachments,
+  listSelfPayments,
   listSelfShipments,
+  SELF_PAY_METHOD_MAP,
   SELF_SHIPMENT_STATUS_MAP,
+  uploadSelfImage,
+  type SelfAttachment,
   type SelfOrderDetail,
+  type SelfPayment,
   type SelfShipment,
 } from '../api/selfOrder'
 import {
@@ -122,8 +241,30 @@ const route = useRoute()
 const router = useRouter()
 const detail = ref<SelfOrderDetail | null>(null)
 const shipments = ref<SelfShipment[]>([])
+const payments = ref<SelfPayment[]>([])
+const attachments = ref<SelfAttachment[]>([])
 const loading = ref(true)
 const shipmentsLoading = ref(false)
+const paymentsLoading = ref(false)
+const showPaySheet = ref(false)
+const savingPay = ref(false)
+const shotFiles = ref<UploaderFileListItem[]>([])
+
+const payMethods = [
+  { value: 'bank', label: '银行转账' },
+  { value: 'alipay', label: '支付宝' },
+  { value: 'wechat', label: '微信' },
+  { value: 'other', label: '其他' },
+]
+
+const payForm = reactive({
+  payAmountText: '',
+  payMethod: 'bank',
+  payAccount: '',
+  payeeAccount: '',
+  payeeName: '',
+  remark: '',
+})
 
 const itemById = computed(() => {
   const map = new Map<number, NonNullable<SelfOrderDetail['items']>[number]>()
@@ -133,7 +274,6 @@ const itemById = computed(() => {
   return map
 })
 
-/** 商品行 → 物流文案（快递名 + 单号），与电脑端一致 */
 const logisticsByItem = computed(() => {
   const map = new Map<number, string[]>()
   for (const sh of shipments.value) {
@@ -147,6 +287,44 @@ const logisticsByItem = computed(() => {
     }
   }
   return map
+})
+
+const paidSum = computed(() =>
+  payments.value.filter((p) => p.payStatus === 'paid').reduce((s, p) => s + Number(p.payAmount || 0), 0),
+)
+
+const remainAmount = computed(() => Math.max(0, Number(detail.value?.saleAmount || 0) - paidSum.value))
+
+const screenshotsByPayment = computed(() => {
+  const map = new Map<number, SelfAttachment[]>()
+  for (const a of attachments.value) {
+    if (a.fileType !== 'payment_screenshot' || !a.paymentId) continue
+    const arr = map.get(a.paymentId) || []
+    arr.push(a)
+    map.set(a.paymentId, arr)
+  }
+  return map
+})
+
+/** 电商单默认视为平台收款，不展示手工记录付款 */
+const showPaymentSection = computed(() => {
+  if (!detail.value) return false
+  if ((detail.value.sourceChannel || '').toLowerCase() === 'kdzs') return false
+  if (detail.value.status === 'draft') return false
+  return true
+})
+
+const canRecordPay = computed(() => {
+  if (!showPaymentSection.value || !detail.value) return false
+  if (detail.value.status === 'cancelled') return false
+  const pay = (detail.value.payStatus || 'unpaid').trim()
+  return pay === 'unpaid' || pay === 'partial'
+})
+
+const canShip = computed(() => {
+  if (!detail.value?.refSoId) return false
+  const ship = deriveSelfShipStatus(detail.value.status)
+  return ship === 'wait_ship' || ship === 'partial_shipped'
 })
 
 function shipmentGoodsLines(sh: SelfShipment): string[] {
@@ -182,11 +360,9 @@ function payTagClass(pay?: string) {
   return ''
 }
 
-const canShip = computed(() => {
-  if (!detail.value?.refSoId) return false
-  const ship = deriveSelfShipStatus(detail.value.status)
-  return ship === 'wait_ship' || ship === 'partial_shipped'
-})
+function payMethodLabel(method?: string) {
+  return SELF_PAY_METHOD_MAP[method || ''] || method || '—'
+}
 
 function goShip() {
   if (!detail.value?.refSoId) return
@@ -194,6 +370,114 @@ function goShip() {
     path: `/ship/${detail.value.refSoId}`,
     query: detail.value.refTraceId ? { no: detail.value.refTraceId } : undefined,
   })
+}
+
+function openPaySheet() {
+  payForm.payAmountText = String(remainAmount.value || Number(detail.value?.saleAmount || 0) || '')
+  payForm.payMethod = 'bank'
+  payForm.payAccount = ''
+  payForm.payeeAccount = ''
+  payForm.payeeName = ''
+  payForm.remark = ''
+  shotFiles.value = []
+  showPaySheet.value = true
+}
+
+function previewShots(paymentId: number, current: string) {
+  const urls = (screenshotsByPayment.value.get(paymentId) || []).map((a) => a.fileUrl).filter(Boolean)
+  if (!urls.length) return
+  const start = Math.max(0, urls.indexOf(current))
+  showImagePreview({ images: urls, startPosition: start })
+}
+
+async function onShotAfterRead(item: UploaderFileListItem | UploaderFileListItem[]) {
+  const list = Array.isArray(item) ? item : [item]
+  for (const fileItem of list) {
+    const raw = fileItem.file
+    if (!raw) continue
+    fileItem.status = 'uploading'
+    fileItem.message = '上传中…'
+    try {
+      const uploaded = await uploadSelfImage(raw, 'self/payments')
+      fileItem.url = uploaded.url
+      fileItem.status = 'done'
+      fileItem.message = ''
+    } catch (e: any) {
+      fileItem.status = 'failed'
+      fileItem.message = e?.message || '上传失败'
+      showFailToast(e?.message || '截图上传失败')
+    }
+  }
+}
+
+function fileNameFromUrl(url: string) {
+  try {
+    const path = url.split('?')[0]
+    const name = path.split('/').pop() || ''
+    return decodeURIComponent(name) || '付款截图.jpg'
+  } catch {
+    return '付款截图.jpg'
+  }
+}
+
+async function submitPay() {
+  if (!detail.value?.id || savingPay.value) return
+  const amount = Number(payForm.payAmountText)
+  if (!(amount > 0)) {
+    showFailToast('请输入付款金额')
+    return
+  }
+  const pendingUrls = shotFiles.value
+    .filter((f) => f.status === 'done' && f.url)
+    .map((f) => String(f.url))
+  const uploading = shotFiles.value.some((f) => f.status === 'uploading')
+  if (uploading) {
+    showFailToast('截图还在上传，请稍候')
+    return
+  }
+  const failed = shotFiles.value.some((f) => f.status === 'failed')
+  if (failed) {
+    showFailToast('有截图上传失败，请删除后重试')
+    return
+  }
+
+  savingPay.value = true
+  try {
+    const payment = await createSelfPayment(detail.value.id, {
+      payAmount: amount,
+      payMethod: payForm.payMethod,
+      payAccount: payForm.payAccount.trim(),
+      payeeAccount: payForm.payeeAccount.trim(),
+      payeeName: payForm.payeeName.trim(),
+      remark: payForm.remark.trim(),
+      payStatus: 'paid',
+    })
+    for (const url of pendingUrls) {
+      await createSelfAttachment(detail.value.id, {
+        fileType: 'payment_screenshot',
+        fileName: fileNameFromUrl(url),
+        fileUrl: url,
+        paymentId: payment.id,
+        remark: '付款截图',
+      })
+    }
+    const nextPaid = paidSum.value + amount
+    const total = Number(detail.value.saleAmount || 0)
+    if (total > 0 && nextPaid + 0.001 >= total) {
+      showSuccessToast('已记录，订单已标记付清')
+    } else if (total > 0) {
+      showSuccessToast(`已记录（已付 ¥${nextPaid.toFixed(2)}）`)
+    } else {
+      showSuccessToast('已记录付款')
+    }
+    showPaySheet.value = false
+    detail.value = await getSelfOrder(detail.value.id)
+    await loadPayments(detail.value.id)
+  } catch (e: any) {
+    showFailToast(e?.message || '保存失败')
+  } finally {
+    savingPay.value = false
+  }
 }
 
 async function loadShipments(selfOrderId: number) {
@@ -208,19 +492,47 @@ async function loadShipments(selfOrderId: number) {
   }
 }
 
+async function loadPayments(selfOrderId: number) {
+  if (!showPaymentSection.value && detail.value) {
+    // still allow load if channel known after detail set
+  }
+  paymentsLoading.value = true
+  try {
+    const [pays, files] = await Promise.all([
+      listSelfPayments(selfOrderId),
+      listSelfAttachments(selfOrderId),
+    ])
+    payments.value = pays
+    attachments.value = files
+  } catch (e: any) {
+    payments.value = []
+    attachments.value = []
+    showFailToast(e.message || '加载付款失败')
+  } finally {
+    paymentsLoading.value = false
+  }
+}
+
 onMounted(async () => {
   const id = Number(route.params.id)
   showLoadingToast({ message: '加载中…', forbidClick: true, duration: 0 })
   try {
     detail.value = await getSelfOrder(id)
     if (detail.value?.id) {
-      await loadShipments(detail.value.id)
+      const tasks: Promise<void>[] = [loadShipments(detail.value.id)]
+      if ((detail.value.sourceChannel || '').toLowerCase() !== 'kdzs' && detail.value.status !== 'draft') {
+        tasks.push(loadPayments(detail.value.id))
+      }
+      await Promise.all(tasks)
     }
   } catch (e: any) {
     showFailToast(e.message || '加载失败')
   } finally {
     loading.value = false
     closeToast()
+    if (route.query.pay === '1' && canRecordPay.value) {
+      openPaySheet()
+    }
   }
 })
 </script>
@@ -296,10 +608,47 @@ onMounted(async () => {
 .goods-logistics__empty {
   font-size: 12px;
 }
-.ship-list {
+.ship-list,
+.pay-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.pay-card__hd {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pay-card__hd strong {
+  font-family: var(--ops-display);
+  font-size: 18px;
+  color: var(--ops-danger);
+}
+.pay-card__meta {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.pay-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pay-shot {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.pay-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .ship-card__hd {
   display: flex;
@@ -317,16 +666,14 @@ onMounted(async () => {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
-  font-size: 15px;
+  margin-bottom: 6px;
 }
 .ship-card__mail {
   font-family: var(--ops-display);
   font-weight: 650;
-  letter-spacing: 0.02em;
-  word-break: break-all;
+  letter-spacing: -0.02em;
 }
 .ship-card__meta {
-  margin-top: 6px;
   font-size: 12px;
   display: flex;
   flex-wrap: wrap;
@@ -344,9 +691,7 @@ onMounted(async () => {
 }
 .ship-goods-line {
   font-size: 13px;
-  font-weight: 550;
   line-height: 1.45;
-  padding: 2px 0;
 }
 .ship-card__recv {
   margin-top: 8px;
@@ -354,12 +699,65 @@ onMounted(async () => {
 }
 .empty-ship {
   padding: 8px 0;
-  font-size: 13px;
+  text-align: center;
 }
 .footer-safe {
   position: sticky;
   bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 12px 0 calc(12px + var(--ops-safe-bottom));
-  background: linear-gradient(180deg, transparent, var(--ops-bg) 30%);
+  background: linear-gradient(180deg, rgba(232, 238, 242, 0), rgba(232, 238, 242, 0.92) 28%, #e8eef2 100%);
+}
+.pay-sheet {
+  max-height: min(88vh, 720px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.pay-hint {
+  padding: 0 4px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.pay-method-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  justify-content: flex-end;
+}
+.pay-method-chip {
+  border: 1px solid var(--ops-line);
+  background: #fff;
+  color: var(--ops-text);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.pay-method-chip.active {
+  border-color: var(--ops-primary);
+  background: var(--ops-primary-soft);
+  color: var(--ops-primary);
+  font-weight: 650;
+}
+.pay-upload-block {
+  padding: 8px 16px 12px;
+}
+.pay-upload-label {
+  font-size: 14px;
+  color: var(--ops-text);
+  margin-bottom: 8px;
+}
+.pay-upload-tip {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.pay-sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 8px 4px 4px;
 }
 </style>
