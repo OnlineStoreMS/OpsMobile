@@ -154,10 +154,17 @@
 
       <div class="section-label">托寄物</div>
       <div class="card">
+        <van-field
+          v-model.number="form.totalParcelQty"
+          type="digit"
+          label="总包裹数"
+          placeholder="默认 1，大于 1 为子母件"
+        />
+        <div class="muted pad">多商品默认 1 包；行内「包裹数」仅用于重量换算</div>
         <div v-for="(line, idx) in form.cargoLines" :key="idx" class="cargo-block">
           <van-field v-model="line.name" label="名称" placeholder="物品名称" />
           <van-field v-model.number="line.itemCount" type="digit" label="件数" />
-          <van-field v-model.number="line.parcelQty" type="digit" label="包裹数" />
+          <van-field v-model.number="line.parcelQty" type="digit" label="行包裹" />
           <van-field v-model.number="line.weight" type="number" label="重量kg" />
           <div class="cargo-actions" v-if="form.cargoLines.length > 1">
             <van-button size="mini" plain hairline type="danger" @click="removeCargoLine(idx)">删除行</van-button>
@@ -412,6 +419,8 @@ const form = reactive({
   shipperProfileId: undefined as number | undefined,
   payMode: 'monthly' as PayMode,
   expressType: (localStorage.getItem(EXPRESS_TYPE_KEY) === '1' ? '1' : '2') as string,
+  /** 顺丰总包裹数，多商品默认 1（一票一件） */
+  totalParcelQty: 1,
   cargoLines: [emptyCargoLine('商品')] as CargoLine[],
   pickupMode: 'self' as 'self' | 'appoint',
   /** [dayOffset, slotKey] 对齐电脑版 */
@@ -562,17 +571,16 @@ const namedCargoLines = computed(() => form.cargoLines.filter((l) => (l.name || 
 
 const cargoTotals = computed(() => {
   const lines = namedCargoLines.value.length ? namedCargoLines.value : form.cargoLines
-  let parcelQty = 0
   let weight = 0
   let itemCount = 0
   for (const line of lines) {
     const pq = line.parcelQty > 0 ? line.parcelQty : 1
-    parcelQty += pq
     weight += (line.weight > 0 ? line.weight : 0) * pq
     itemCount += (line.itemCount > 0 ? line.itemCount : 0) * pq
   }
+  const totalParcel = Number(form.totalParcelQty)
   return {
-    parcelQty: parcelQty || 1,
+    parcelQty: totalParcel > 0 ? totalParcel : 1,
     weight: Math.round(weight * 1000) / 1000,
     itemCount: itemCount || 0,
   }
@@ -749,6 +757,7 @@ function applyHandoff(h: SFOrderHandoff) {
     })
     .filter((x): x is CargoLine => !!x)
   form.cargoLines = lines.length ? lines : [emptyCargoLine('商品')]
+  form.totalParcelQty = 1
 }
 
 function buildOrderSnapshot(): OrderSnapshot {
@@ -789,10 +798,11 @@ function validate(): string | null {
     if (!linked.length) return '订单商品行 ID 丢失，请返回重新勾选商品进入'
   }
   for (const [i, line] of namedCargoLines.value.entries()) {
-    if (!(line.parcelQty > 0)) return `第 ${i + 1} 行请填写包裹数`
+    if (!(line.parcelQty > 0)) return `第 ${i + 1} 行请填写行包裹数（换算用）`
     if (!(line.weight > 0)) return `第 ${i + 1} 行请填写重量`
     if (!(line.itemCount > 0)) return `第 ${i + 1} 行请填写件数`
   }
+  if (!(form.totalParcelQty > 0)) return '请填写总包裹数（默认 1；大于 1 为子母件）'
   if (form.payMode === 'monthly' && !carrierView.value?.custId) {
     return '当前物流账号未配置月结卡号，请改选寄付现结或到付'
   }
