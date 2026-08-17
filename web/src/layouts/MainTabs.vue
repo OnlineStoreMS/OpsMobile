@@ -29,9 +29,14 @@
     </div>
 
     <!-- 子页栈：推进 / 返回左右滑 -->
-    <div v-if="!isHub" class="deep-layer" :class="{ 'deep-layer--slide': isSlide }">
+    <div v-if="!isHub" class="deep-layer" :class="{ 'deep-layer--locking': slideLocking }">
       <router-view v-slot="{ Component, route: r }">
-        <transition :name="transitionName">
+        <transition
+          :name="transitionName"
+          @before-enter="onSlideLock"
+          @after-enter="onSlideUnlock"
+          @after-leave="onSlideUnlock"
+        >
           <component :is="Component" :key="r.fullPath" />
         </transition>
       </router-view>
@@ -52,8 +57,19 @@ const hubIndex = ref(hubIndexByPath(route.path))
 
 const isHub = computed(() => Boolean(route.meta.hub) || isHubPath(route.path))
 
-const transitionName = ref('slide-left')
-const isSlide = computed(() => transitionName.value.startsWith('slide-'))
+const transitionName = ref('fade-tab')
+/** 仅动画期间锁定父层 overflow，结束后必须放开，否则子页无法下滑 */
+const slideLocking = ref(false)
+
+function onSlideLock() {
+  if (transitionName.value.startsWith('slide-')) {
+    slideLocking.value = true
+  }
+}
+
+function onSlideUnlock() {
+  slideLocking.value = false
+}
 
 function histPos() {
   return (window.history.state as { position?: number } | null)?.position
@@ -107,7 +123,10 @@ watch(
 )
 
 watch(isHub, (hub) => {
-  if (hub) syncSwipeToRoute()
+  if (hub) {
+    slideLocking.value = false
+    syncSwipeToRoute()
+  }
 })
 
 router.beforeEach((to, from) => {
@@ -217,8 +236,10 @@ router.afterEach(() => {
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
-.deep-layer--slide {
+/* 左右滑动画中短暂锁滚动，避免双层滚动；动画结束后恢复 */
+.deep-layer--locking {
   overflow: hidden;
 }
 </style>
