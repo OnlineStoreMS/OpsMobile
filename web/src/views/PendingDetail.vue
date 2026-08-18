@@ -7,6 +7,7 @@
         <div class="detail-hero__tags">
           <span class="ops-tag">{{ labelOmsStatus(detail.status) }}</span>
           <span class="ops-tag ops-tag--warn">{{ labelShipStatus(detail.shipStatus) }}</span>
+          <span v-if="pendingPlanCount" class="ops-tag ops-tag--ok">已拆 {{ pendingPlanCount }} 段</span>
         </div>
         <div class="detail-hero__price" v-if="detail.totalAmount != null || detail.payAmount != null">
           ¥{{ Number(detail.payAmount ?? detail.totalAmount ?? 0).toFixed(2) }}
@@ -48,22 +49,29 @@
 
       <div class="section-label">商品明细</div>
       <div class="card">
-        <div v-for="(it, idx) in detail.items || []" :key="idx" class="goods-row">
-          <img v-if="it.picUrl" :src="it.picUrl" alt="" />
+        <div v-for="row in goodsRows" :key="row.key" class="goods-row">
+          <img v-if="row.picUrl" :src="row.picUrl" alt="" />
           <div class="goods-info">
-            <div class="goods-name">{{ it.skuSpecs || it.productName || '商品' }}</div>
-            <div class="muted">
-              ×{{ it.quantity || 1 }}
-              <template v-if="it.price != null"> · ¥{{ Number(it.price).toFixed(2) }}</template>
-              <template v-if="it.totalAmount != null"> · 小计 ¥{{ Number(it.totalAmount).toFixed(2) }}</template>
+            <div class="goods-name">
+              {{ row.title }}
+              <span v-if="row.isSplit" class="tag-split">拆分</span>
+            </div>
+            <div class="muted" v-if="row.shipped > 0">
+              已发 {{ row.shipped }}/{{ row.total }}
+              <template v-if="row.fullyShipped"> · 已发完</template>
             </div>
           </div>
         </div>
-        <div v-if="!detail.items?.length" class="muted">无商品行</div>
+        <div v-if="!goodsRows.length" class="muted">无商品行</div>
       </div>
 
       <div class="footer-safe" v-if="canShip">
-        <van-button type="primary" block round @click="goShip">打单发货</van-button>
+        <div class="footer-safe__row">
+          <van-button plain round hairline type="primary" @click="goShip(true)">
+            {{ pendingPlanCount ? '编辑拆分' : '拆分' }}
+          </van-button>
+          <van-button type="primary" round style="flex: 1" @click="goShip()">打单发货</van-button>
+        </div>
       </div>
     </div>
     <van-empty v-else-if="!loading" description="未找到订单" />
@@ -74,8 +82,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showLoadingToast, closeToast } from 'vant'
-import { getOmsOrder, listPendingOmsOrders, type OMSOrder } from '../api/shipping'
+import { getOmsOrder, listPendingOmsOrders, shippingApi, type OMSOrder } from '../api/shipping'
 import { formatOrderSource, formatTime, labelOmsStatus, labelShipStatus } from '../utils/labels'
+import { orderGoodsDisplayRows } from '../utils/sfOrderHandoff'
 
 const route = useRoute()
 const router = useRouter()
@@ -94,11 +103,17 @@ const canShip = computed(() => {
   return !s || s === 'wait_ship' || s === 'partial_shipped' || s.includes('wait')
 })
 
-function goShip() {
+const goodsRows = computed(() => (detail.value ? orderGoodsDisplayRows(detail.value) : []))
+const pendingPlanCount = computed(() => detail.value?.pendingPlanCount || 0)
+
+function goShip(split?: boolean) {
   if (!detail.value) return
   router.push({
     path: `/ship/${detail.value.id}`,
-    query: detail.value.orderNo ? { no: detail.value.orderNo } : undefined,
+    query: {
+      ...(detail.value.orderNo ? { no: detail.value.orderNo } : {}),
+      ...(split ? { split: '1' } : {}),
+    },
   })
 }
 
@@ -108,18 +123,30 @@ async function loadDetail() {
   try {
     return await getOmsOrder(id)
   } catch {
-    // 兜底：按订单号从待发货列表找
     const no = typeof route.query.no === 'string' ? route.query.no : ''
     const keyword = no || String(id)
-    const res = await listPendingOmsOrders({ keyword, shipStatus: 'wait_ship', page: 1, pageSize: 50 })
+    const res = await listPendingOmsOrders({ keyword, shipStatus: 'need_ship', page: 1, pageSize: 50 })
     return (res.list || []).find((o) => o.id === id) || (res.list || []).find((o) => o.orderNo === no) || null
+  }
+}
+
+async function attachShipPlan(order: OMSOrder) {
+  try {
+    const { list } = await shippingApi.getShipPlan(order.id)
+    order.shipPlanLines = list || []
+    order.pendingPlanCount = (list || []).filter((l) => l.status === 'pending').length
+  } catch {
+    order.shipPlanLines = []
+    order.pendingPlanCount = 0
   }
 }
 
 onMounted(async () => {
   showLoadingToast({ message: '加载中…', forbidClick: true, duration: 0 })
   try {
-    detail.value = await loadDetail()
+    const o = await loadDetail()
+    if (o) await attachShipPlan(o)
+    detail.value = o
   } catch (e: any) {
     showFailToast(e.message || '加载失败')
   } finally {
@@ -149,7 +176,8 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 .detail-hero__tags .ops-tag,
-.detail-hero__tags .ops-tag--warn {
+.detail-hero__tags .ops-tag--warn,
+.detail-hero__tags .ops-tag--ok {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
 }
@@ -160,10 +188,26 @@ onMounted(async () => {
   font-weight: 700;
   letter-spacing: -0.03em;
 }
+.tag-split {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #047857;
+  background: #d1fae5;
+  padding: 1px 6px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
 .footer-safe {
   position: sticky;
   bottom: 0;
   padding: 12px 0 calc(12px + var(--ops-safe-bottom));
   background: linear-gradient(180deg, transparent, var(--ops-bg) 30%);
+}
+.footer-safe__row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 </style>

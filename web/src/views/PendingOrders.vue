@@ -43,12 +43,17 @@
         >
           <div class="order-card__top">
             <div class="order-card__no">{{ row.orderNo }}</div>
-            <span
-              class="ops-tag order-card__tag"
-              :class="row.shipStatus === 'partial_shipped' ? 'ops-tag--warn' : 'ops-tag--warn'"
-            >
-              {{ labelShipStatus(row.shipStatus) || '待发货' }}
-            </span>
+            <div class="order-card__tags">
+              <span
+                class="ops-tag order-card__tag"
+                :class="row.shipStatus === 'partial_shipped' ? 'ops-tag--warn' : 'ops-tag--warn'"
+              >
+                {{ labelShipStatus(row.shipStatus) || '待发货' }}
+              </span>
+              <span v-if="row.pendingPlanCount" class="ops-tag ops-tag--ok">
+                已拆 {{ row.pendingPlanCount }} 段
+              </span>
+            </div>
           </div>
 
           <div class="receiver-box">
@@ -61,19 +66,19 @@
           </div>
 
           <div class="order-card__meta">
-            <div>{{ formatSpecLine(row.items) }}</div>
+            <div>{{ formatOrderGoodsSummary(row) }}</div>
             <div>来源 <strong>{{ formatOrderSource(row) }}</strong></div>
           </div>
           <div class="order-card__foot">
             <div class="order-card__time">{{ formatTime(row.orderedAt || row.payTime) }}</div>
-            <van-button
-              size="mini"
-              type="primary"
-              round
-              @click.stop="openShip(row)"
-            >
-              打单发货
-            </van-button>
+            <div class="order-card__actions" @click.stop>
+              <van-button size="mini" plain round hairline type="primary" @click="openShip(row, true)">
+                {{ row.pendingPlanCount ? '编辑拆分' : '拆分' }}
+              </van-button>
+              <van-button size="mini" type="primary" round @click="openShip(row)">
+                打单发货
+              </van-button>
+            </div>
           </div>
         </div>
         <van-empty v-if="!loading && !list.length" description="暂无待发货" />
@@ -86,8 +91,9 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
-import { listPendingOmsOrders, type OMSOrder } from '../api/shipping'
-import { formatOrderSource, formatSpecLine, formatTime, labelShipStatus } from '../utils/labels'
+import { listPendingOmsOrders, shippingApi, type OMSOrder } from '../api/shipping'
+import { formatOrderSource, formatTime, labelShipStatus } from '../utils/labels'
+import { formatOrderGoodsSummary } from '../utils/sfOrderHandoff'
 
 const route = useRoute()
 const router = useRouter()
@@ -120,10 +126,13 @@ function openDetail(row: OMSOrder) {
   })
 }
 
-function openShip(row: OMSOrder) {
+function openShip(row: OMSOrder, split?: boolean) {
   router.push({
     path: `/ship/${row.id}`,
-    query: row.orderNo ? { no: row.orderNo } : undefined,
+    query: {
+      ...(row.orderNo ? { no: row.orderNo } : {}),
+      ...(split ? { split: '1' } : {}),
+    },
   })
 }
 
@@ -131,6 +140,34 @@ function onFilterChange(next: 'all' | 'partial') {
   if (filter.value === next) return
   filter.value = next
   void reload()
+}
+
+async function attachPendingPlanCounts(orders: OMSOrder[]) {
+  const ids = orders.map((o) => o.id).filter((id) => id > 0)
+  if (!ids.length) return
+  try {
+    const { counts } = await shippingApi.countPendingShipPlans(ids)
+    for (const o of orders) {
+      o.pendingPlanCount = counts[String(o.id)] || 0
+      o.shipPlanLines = o.shipPlanLines || []
+    }
+    const needPlans = orders.filter(
+      (o) => (o.pendingPlanCount || 0) > 0 || o.shipStatus === 'partial_shipped',
+    )
+    await Promise.all(
+      needPlans.map(async (o) => {
+        try {
+          const { list: plans } = await shippingApi.getShipPlan(o.id)
+          o.shipPlanLines = plans || []
+          o.pendingPlanCount = (plans || []).filter((l) => l.status === 'pending').length
+        } catch {
+          o.shipPlanLines = []
+        }
+      }),
+    )
+  } catch {
+    /* optional */
+  }
 }
 
 async function reload() {
@@ -143,7 +180,6 @@ async function reload() {
 async function loadMore() {
   loading.value = true
   try {
-    // need_ship = wait_ship + partial_shipped（订单中心工作队列）
     const shipStatus = filter.value === 'partial' ? 'partial_shipped' : 'need_ship'
     const res = await listPendingOmsOrders({
       keyword: keyword.value.trim() || undefined,
@@ -152,6 +188,7 @@ async function loadMore() {
       pageSize: 20,
     })
     const rows = res.list || []
+    await attachPendingPlanCounts(rows)
     list.value.push(...rows)
     if (list.value.length >= (res.total || 0) || rows.length < 20) {
       finished.value = true
@@ -165,6 +202,10 @@ async function loadMore() {
     loading.value = false
   }
 }
+
+onMounted(() => {
+  /* van-list will trigger loadMore */
+})
 </script>
 
 <style scoped>
@@ -227,5 +268,16 @@ async function loadMore() {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.order-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.order-card__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 </style>

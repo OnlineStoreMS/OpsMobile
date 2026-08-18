@@ -377,6 +377,7 @@ type CargoLine = {
   weight: number
   itemCount: number
   orderItemId?: number
+  planLineId?: number
   title?: string
   outerId?: string
   price?: number
@@ -389,6 +390,7 @@ function emptyCargoLine(name = ''): CargoLine {
     weight: 1,
     itemCount: 1,
     orderItemId: 0,
+    planLineId: 0,
     title: '',
     outerId: '',
     price: 0,
@@ -748,6 +750,7 @@ function applyHandoff(h: SFOrderHandoff) {
       if (!name) return null
       const line = emptyCargoLine(name)
       line.orderItemId = g.orderItemId || 0
+      line.planLineId = g.planLineId || 0
       line.title = g.title || ''
       line.itemCount = g.num > 0 ? g.num : 1
       line.parcelQty = 1
@@ -778,6 +781,7 @@ function buildOrderSnapshot(): OrderSnapshot {
     receiverAddress: form.receiverAddress.trim(),
     goods: namedCargoLines.value.map((l) => ({
       orderItemId: l.orderItemId || 0,
+      planLineId: l.planLineId || 0,
       title: l.title || l.name,
       skuName: l.name,
       num: l.itemCount > 0 ? l.itemCount : 1,

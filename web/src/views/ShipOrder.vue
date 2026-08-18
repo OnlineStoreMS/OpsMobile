@@ -20,12 +20,17 @@
 
       <div class="section-label">
         发货商品
-        <span class="section-label__extra" v-if="shipRows.length">
-          已选 {{ selectedIndexes.length }}/{{ shipRows.length }}
+        <span class="section-label__extra">
+          <button type="button" class="link-btn" @click="openSplitEdit">
+            {{ pendingPlanCount ? '编辑拆分' : '拆分' }}
+          </button>
+          <template v-if="shipPickRows.length">
+            · 已选 {{ selectedKeys.length }}/{{ shipPickRows.length }}
+          </template>
         </span>
       </div>
       <div class="card">
-        <div class="ship-items-hd" v-if="shipRows.length">
+        <div class="ship-items-hd" v-if="shipPickRows.length">
           <button type="button" class="check-all" @click="toggleAll">
             <span class="check-box" :class="{ 'check-box--on': allSelected, 'check-box--half': indeterminate }">
               <van-icon v-if="allSelected" name="success" />
@@ -33,41 +38,52 @@
             </span>
             <span>全选</span>
           </button>
-          <span class="muted hd-hint" v-if="doneRows.length">
-            另有 {{ doneRows.length }} 件已发完
+          <span class="muted hd-hint" v-if="pendingPlanCount">
+            已拆 {{ pendingPlanCount }} 段
           </span>
         </div>
         <div class="goods-list">
-          <button
-            v-for="row in shipRows"
-            :key="row.index"
-            type="button"
-            class="goods-row"
-            @click="toggleItem(row.index)"
+          <div
+            v-for="row in shipPickRows"
+            :key="row.key"
+            class="goods-row goods-row--pick"
           >
-            <span
-              class="check-box"
-              :class="{ 'check-box--on': selectedIndexes.includes(row.index) }"
-              aria-hidden="true"
-            >
-              <van-icon v-if="selectedIndexes.includes(row.index)" name="success" />
-            </span>
-            <img v-if="row.item.picUrl" :src="row.item.picUrl" alt="" />
+            <button type="button" class="goods-row__check" @click="toggleItem(row.key)">
+              <span
+                class="check-box"
+                :class="{ 'check-box--on': selectedKeys.includes(row.key) }"
+                aria-hidden="true"
+              >
+                <van-icon v-if="selectedKeys.includes(row.key)" name="success" />
+              </span>
+            </button>
+            <img v-if="row.picUrl" :src="row.picUrl" alt="" />
             <div class="goods-info">
-              <div class="goods-name">{{ row.item.skuSpecs || row.item.productName || '商品' }}</div>
-              <div class="muted qty-line">
-                待发 ×{{ row.remaining }}
-                <span v-if="row.shipped > 0"> · 已发 {{ row.shipped }}/{{ row.item.quantity || 0 }}</span>
+              <div class="goods-name">
+                {{ row.label }}
+                <span v-if="row.kind === 'plan'" class="tag-split">拆分</span>
+              </div>
+              <div class="qty-edit" @click.stop>
+                <span class="muted">发货</span>
+                <van-stepper
+                  v-model="row.shipQty"
+                  :min="1"
+                  :max="row.maxQty"
+                  integer
+                  theme="round"
+                  button-size="22px"
+                />
+                <span class="muted">/ {{ row.maxQty }}</span>
               </div>
             </div>
-          </button>
+          </div>
         </div>
-        <div v-if="!shipRows.length" class="muted empty-ship">
+        <div v-if="!shipPickRows.length" class="muted empty-ship">
           {{ (order.items || []).length ? '商品均已发完，无需再发' : '无商品行' }}
         </div>
         <div
           class="tip tip--warn tip--inline"
-          v-if="shipRows.length && selectedIndexes.length === 0"
+          v-if="shipPickRows.length && selectedKeys.length === 0"
         >
           请先勾选要发货的商品，否则无法确认发货或进入下一步
         </div>
@@ -75,13 +91,13 @@
           class="muted tip tip--inline"
           v-else-if="isPartialSelection"
         >
-          部分发货：仅勾选商品按剩余可发数量写入本次运单，订单将保持「部分发货」直至全部发完
+          部分发货：仅勾选商品按本次件数写入运单，订单将保持「部分发货」直至全部发完
         </div>
         <div
           class="muted tip tip--inline"
-          v-else-if="order.shipStatus === 'partial_shipped' && shipRows.length"
+          v-else-if="order.shipStatus === 'partial_shipped' && shipPickRows.length"
         >
-          继续发货：下方仅显示尚未发完的商品，全选即发完本单剩余
+          继续发货：下方仅显示尚未发完的商品/拆分段，全选即发完本单剩余
         </div>
       </div>
 
@@ -261,6 +277,92 @@
         <div v-if="!shippers.length" class="muted pad">暂无寄件人档案</div>
       </div>
     </van-popup>
+
+    <van-popup
+      v-model:show="showSplit"
+      position="bottom"
+      round
+      teleport="body"
+      class="sheet-popup"
+      style="height: 85%"
+      safe-area-inset-bottom
+    >
+      <div class="sheet split-sheet">
+        <div class="sheet-title">拆分发货 — {{ order?.orderNo || '' }}</div>
+        <van-radio-group
+          :model-value="splitEditMode"
+          direction="horizontal"
+          class="mode-radios"
+          @update:model-value="onSplitEditModeChange"
+        >
+          <van-radio name="partial">按商品拆分</van-radio>
+          <van-radio name="full">整单拆分</van-radio>
+        </van-radio-group>
+        <div class="muted tip tip--inline">
+          <template v-if="splitEditMode === 'full'">
+            整单拆分：只填规格名称；保存后打单全部按这些规格行勾选。
+          </template>
+          <template v-else>
+            对需要拆分的商品点「加拆分」；未拆分的商品打单时仍按原行勾选。
+          </template>
+        </div>
+
+        <div v-if="splitEditMode === 'full'" class="split-block">
+          <div class="split-block__hd">
+            <span>拆分规格</span>
+            <button type="button" class="link-btn" @click="addFullSplitDraftLine">加拆分</button>
+          </div>
+          <div v-for="line in splitDraftLines" :key="line.key" class="split-line">
+            <van-field v-model="line.skuName" placeholder="规格名称" clearable />
+            <van-stepper v-model="line.qty" :min="1" integer button-size="22px" />
+            <button type="button" class="link-btn link-btn--danger" @click="removeSplitDraftLine(line.key)">删</button>
+          </div>
+          <div v-if="!splitDraftLines.length" class="muted tip tip--inline">点击「加拆分」添加规格</div>
+        </div>
+
+        <div v-else class="split-block">
+          <div
+            v-for="(item, index) in splitRootItems"
+            :key="item.id || index"
+            class="split-item"
+          >
+            <div class="split-item__hd">
+              <img v-if="item.picUrl" :src="item.picUrl" alt="" />
+              <div class="split-item__name">{{ item.skuSpecs || item.productName || '商品' }} ×{{ item.quantity || 1 }}</div>
+              <button
+                v-if="item.id"
+                type="button"
+                class="link-btn"
+                @click="addSplitDraftLine(index, item.id!)"
+              >
+                加拆分
+              </button>
+              <button
+                v-if="splitDraftLinesForItem(index).length"
+                type="button"
+                class="link-btn link-btn--danger"
+                @click="clearSplitDraftForItem(index)"
+              >
+                取消
+              </button>
+            </div>
+            <div
+              v-for="line in splitDraftLinesForItem(index)"
+              :key="line.key"
+              class="split-line"
+            >
+              <van-field v-model="line.skuName" placeholder="规格名称" clearable />
+              <van-stepper v-model="line.qty" :min="1" integer button-size="22px" />
+              <button type="button" class="link-btn link-btn--danger" @click="removeSplitDraftLine(line.key)">删</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="split-sheet__foot">
+          <van-button block round :loading="splitSaving" type="primary" @click="saveSplitPlan">保存拆分</van-button>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -274,8 +376,8 @@ import {
   shippingApi,
   type CarrierAccount,
   type OMSOrder,
-  type OMSOrderItem,
   type ShipperProfile,
+  type ShipPlanLine,
 } from '../api/shipping'
 import {
   findExpressCompany,
@@ -285,23 +387,25 @@ import {
   type ExpressCompany,
 } from '../utils/expressWaybill'
 import {
+  buildShipPickRows,
+  buildShipPickSnapshot,
   goodsCargoName,
-  omsOrderToSnapshot,
   readLastCarrierId,
   readLastShipperId,
-  remainingQtyByItem,
   rememberShipPrefs,
+  rootOMSItems,
   saveSFOrderHandoff,
-  shippedQtyByItem,
 } from '../utils/sfOrderHandoff'
 import { printShipmentByChannel } from '../utils/sfPrintLabel'
 import { getSavedPrinterIndex, getSavedPrinterName } from '../utils/sfPrintPlugin'
 
-type ShipRow = {
-  index: number
-  item: OMSOrderItem
-  remaining: number
-  shipped: number
+type ShipPickRow = ReturnType<typeof buildShipPickRows>[number]
+type SplitDraftLine = {
+  key: string
+  itemIndex: number
+  orderItemId: number
+  skuName: string
+  qty: number
 }
 
 const route = useRoute()
@@ -309,7 +413,9 @@ const router = useRouter()
 const order = ref<OMSOrder | null>(null)
 const loading = ref(true)
 const submitting = ref(false)
-const selectedIndexes = ref<number[]>([])
+const shipPickRows = ref<ShipPickRow[]>([])
+const selectedKeys = ref<string[]>([])
+const pendingShipPlanLines = ref<ShipPlanLine[]>([])
 const carriers = ref<CarrierAccount[]>([])
 const shippers = ref<ShipperProfile[]>([])
 const carrierAccountId = ref<number | undefined>()
@@ -319,6 +425,11 @@ const sfAction = ref<'standard' | 'quick'>('standard')
 const showCarrier = ref(false)
 const showShipper = ref(false)
 const showCompany = ref(false)
+const showSplit = ref(false)
+const splitSaving = ref(false)
+const splitEditMode = ref<'partial' | 'full'>('partial')
+const splitDraftLines = ref<SplitDraftLine[]>([])
+let splitDraftSeq = 0
 
 const EXPRESS_TYPE_KEY = 'shippingcore.sf.expressType'
 const EXPRESS_COMPANY_KEY = 'opsmobile.ship.expressCompany'
@@ -347,33 +458,21 @@ const receiverAddr = computed(() => {
   return a.fullText || [a.province, a.city, a.district, a.address].filter(Boolean).join(' ') || '暂无地址'
 })
 
-const shipRows = computed<ShipRow[]>(() => {
-  const o = order.value
-  if (!o?.items?.length) return []
-  const remaining = remainingQtyByItem(o)
-  const shipped = shippedQtyByItem(o)
-  return o.items
-    .map((item, index) => {
-      const id = item.id
-      const left = id ? remaining[id] : item.quantity || 0
-      const done = id ? shipped[id] || 0 : 0
-      return { index, item, remaining: left, shipped: done }
-    })
-    .filter((r) => r.remaining > 0)
-})
+const pendingPlanCount = computed(
+  () => pendingShipPlanLines.value.filter((l) => l.status === 'pending').length,
+)
 
-const doneRows = computed(() => {
-  const o = order.value
-  if (!o?.items?.length) return []
-  const remaining = remainingQtyByItem(o)
-  return o.items.filter((it) => it.id && (remaining[it.id] || 0) <= 0)
-})
+const selectedPickRows = computed(() =>
+  shipPickRows.value.filter((r) => selectedKeys.value.includes(r.key)),
+)
+
+const splitRootItems = computed(() => (order.value ? rootOMSItems(order.value) : []))
 
 const allSelected = computed(
-  () => shipRows.value.length > 0 && selectedIndexes.value.length === shipRows.value.length,
+  () => shipPickRows.value.length > 0 && selectedKeys.value.length === shipPickRows.value.length,
 )
 const indeterminate = computed(
-  () => selectedIndexes.value.length > 0 && selectedIndexes.value.length < shipRows.value.length,
+  () => selectedKeys.value.length > 0 && selectedKeys.value.length < shipPickRows.value.length,
 )
 
 const carrierView = computed(
@@ -384,7 +483,7 @@ const shipperView = computed(
 )
 
 const canSubmit = computed(() => {
-  if (!order.value || selectedIndexes.value.length === 0) return false
+  if (!order.value || selectedKeys.value.length === 0) return false
   if (shipMode.value === 'manual') {
     return (
       !!expressCompany.value.trim() &&
@@ -401,60 +500,196 @@ const primaryLabel = computed(() => {
   return '快速下单打印'
 })
 
+const isPartialSelection = computed(
+  () =>
+    shipPickRows.value.length > 0 &&
+    selectedKeys.value.length > 0 &&
+    selectedKeys.value.length < shipPickRows.value.length,
+)
+
 function selectAllShippable() {
-  selectedIndexes.value = shipRows.value.map((r) => r.index)
+  selectedKeys.value = shipPickRows.value.map((r) => r.key)
 }
 
 function toggleAll() {
-  if (allSelected.value) selectedIndexes.value = []
+  if (allSelected.value) selectedKeys.value = []
   else selectAllShippable()
 }
 
-function toggleItem(index: number) {
-  const cur = selectedIndexes.value
-  if (cur.includes(index)) {
-    selectedIndexes.value = cur.filter((i) => i !== index)
+function toggleItem(key: string) {
+  const cur = selectedKeys.value
+  if (cur.includes(key)) {
+    selectedKeys.value = cur.filter((k) => k !== key)
   } else {
-    selectedIndexes.value = [...cur, index]
+    selectedKeys.value = [...cur, key]
   }
+}
+
+async function initShipPickSelection(o: OMSOrder) {
+  try {
+    const { list } = await shippingApi.getShipPlan(o.id, 'pending')
+    pendingShipPlanLines.value = list || []
+  } catch {
+    pendingShipPlanLines.value = []
+  }
+  shipPickRows.value = buildShipPickRows(o, pendingShipPlanLines.value)
+  selectedKeys.value = []
 }
 
 function buildSnapshot() {
   if (!order.value) return null
-  const allowed = new Set(shipRows.value.map((r) => r.index))
-  const indexes = selectedIndexes.value.filter((i) => allowed.has(i))
-  if (!indexes.length) {
+  if (!selectedPickRows.value.length) {
     showFailToast('请先勾选要发货的商品')
     return null
   }
-  if (indexes.length !== selectedIndexes.value.length) {
-    selectedIndexes.value = indexes
+  for (const r of selectedPickRows.value) {
+    if (!(r.skuName || '').trim()) {
+      showFailToast('发货规格名称不能为空')
+      return null
+    }
+    if (!(r.orderItemId > 0)) {
+      showFailToast('拆分规格尚未同步订单中心子行，请重新保存拆分后再打单')
+      return null
+    }
+    const maxQty = Math.max(1, r.maxQty || 1)
+    if (!(r.shipQty > 0) || r.shipQty > maxQty) {
+      showFailToast(`发货件数须在 1～${maxQty} 之间`)
+      return null
+    }
   }
-  const snapshot = omsOrderToSnapshot(order.value, {
-    itemIndexes: indexes,
-    qtyByItemId: remainingQtyByItem(order.value),
-  })
-  if (!snapshot.goods.length) {
-    showFailToast('没有可发商品，请刷新订单后重试')
+  try {
+    const snapshot = buildShipPickSnapshot(order.value, selectedPickRows.value)
+    if (!snapshot.goods.length) {
+      showFailToast('没有可发商品，请刷新订单后重试')
+      return null
+    }
+    return snapshot
+  } catch (e) {
+    showFailToast((e as Error).message || '生成发货快照失败')
     return null
   }
-  if (snapshot.goods.some((g) => !(g.orderItemId && g.orderItemId > 0))) {
-    showFailToast('商品行 ID 缺失，无法部分发货，请刷新订单后重试')
-    return null
-  }
-  if (snapshot.goods.some((g) => !(g.num > 0))) {
-    showFailToast('发货数量无效，请刷新订单后重试')
-    return null
-  }
-  return snapshot
 }
 
-const isPartialSelection = computed(
-  () =>
-    shipRows.value.length > 0 &&
-    selectedIndexes.value.length > 0 &&
-    selectedIndexes.value.length < shipRows.value.length,
-)
+function splitDraftLinesForItem(itemIndex: number) {
+  return splitDraftLines.value.filter((l) => l.itemIndex === itemIndex)
+}
+
+function addSplitDraftLine(itemIndex: number, orderItemId: number) {
+  splitDraftSeq += 1
+  splitDraftLines.value.push({
+    key: `d${splitDraftSeq}`,
+    itemIndex,
+    orderItemId,
+    skuName: '',
+    qty: 1,
+  })
+}
+
+function addFullSplitDraftLine() {
+  addSplitDraftLine(-1, 0)
+}
+
+function removeSplitDraftLine(key: string) {
+  splitDraftLines.value = splitDraftLines.value.filter((l) => l.key !== key)
+}
+
+function clearSplitDraftForItem(itemIndex: number) {
+  splitDraftLines.value = splitDraftLines.value.filter((l) => l.itemIndex !== itemIndex)
+}
+
+function onSplitEditModeChange(mode: string | number) {
+  const next = mode === 'full' ? 'full' : 'partial'
+  if (next === splitEditMode.value) return
+  splitEditMode.value = next
+  splitDraftLines.value = []
+  splitDraftSeq = 0
+  if (next === 'full') addFullSplitDraftLine()
+}
+
+async function openSplitEdit() {
+  if (!order.value) return
+  splitDraftLines.value = []
+  splitDraftSeq = 0
+  splitEditMode.value = 'partial'
+  try {
+    const { list } = await shippingApi.getShipPlan(order.value.id)
+    const pending = (list || []).filter((l) => l.status === 'pending')
+    const isFull = pending.length > 0 && pending.every((l) => !l.orderItemId)
+    splitEditMode.value = isFull ? 'full' : 'partial'
+    for (const line of pending) {
+      if (isFull || !line.orderItemId) {
+        splitDraftSeq += 1
+        splitDraftLines.value.push({
+          key: `d${splitDraftSeq}`,
+          itemIndex: -1,
+          orderItemId: 0,
+          skuName: line.skuName,
+          qty: Math.max(1, line.qty || 1),
+        })
+        continue
+      }
+      const itemIndex = rootOMSItems(order.value).findIndex((it) => it.id === line.orderItemId)
+      if (itemIndex < 0) continue
+      splitDraftSeq += 1
+      splitDraftLines.value.push({
+        key: `d${splitDraftSeq}`,
+        itemIndex,
+        orderItemId: line.orderItemId,
+        skuName: line.skuName,
+        qty: Math.max(1, line.qty || 1),
+      })
+    }
+  } catch (e) {
+    showFailToast((e as Error).message || '加载拆分计划失败')
+    return
+  }
+  showSplit.value = true
+}
+
+async function saveSplitPlan() {
+  if (!order.value) return
+  for (const line of splitDraftLines.value) {
+    if (!line.skuName.trim()) {
+      showFailToast('请填写规格名称')
+      return
+    }
+    if (line.qty <= 0) {
+      showFailToast('拆分行数量须大于 0')
+      return
+    }
+    if (splitEditMode.value === 'partial' && !line.orderItemId) {
+      showFailToast('按商品拆分请为每行关联原商品')
+      return
+    }
+  }
+  splitSaving.value = true
+  try {
+    const full = splitEditMode.value === 'full'
+    await shippingApi.putShipPlan(
+      order.value.id,
+      splitDraftLines.value.map((l, i) => ({
+        orderItemId: full ? 0 : l.orderItemId,
+        skuName: l.skuName.trim(),
+        qty: l.qty,
+        sortNo: i + 1,
+      })),
+    )
+    showSuccessToast(
+      splitDraftLines.value.length
+        ? full
+          ? '整单拆分已保存'
+          : '拆分计划已保存'
+        : '已取消拆分',
+    )
+    showSplit.value = false
+    order.value = await loadOrder(order.value.id)
+    await initShipPickSelection(order.value)
+  } catch (e) {
+    showFailToast((e as Error).message || '保存拆分失败')
+  } finally {
+    splitSaving.value = false
+  }
+}
 
 function refreshExpressNoCheck(opts?: { autoFillCompany?: boolean }) {
   const raw = expressNo.value
@@ -477,7 +712,6 @@ function refreshExpressNoCheck(opts?: { autoFillCompany?: boolean }) {
     expressNoHint.value = `已根据单号识别为「${result.suggested.name}」`
     localStorage.setItem(EXPRESS_COMPANY_KEY, result.suggested.name)
     localStorage.setItem(EXPRESS_COMPANY_CODE_KEY, result.suggested.code)
-    // 公司变了再校一次
     return refreshExpressNoCheck()
   }
   return result
@@ -525,7 +759,6 @@ function pickShipper(id: number) {
 }
 
 async function loadOrder(id: number) {
-  // 必须拉详情（含 shipments.items），否则无法计算剩余可发数量
   try {
     return await getOmsOrder(id)
   } catch (e) {
@@ -541,7 +774,6 @@ async function loadOrder(id: number) {
       (res.list || []).find((o) => o.orderNo === no) ||
       null
     if (!hit) throw e
-    // 列表也可能带运单明细；仍尽量再拉一次详情
     try {
       return await getOmsOrder(hit.id)
     } catch {
@@ -685,7 +917,7 @@ async function goQuick() {
 }
 
 async function submit() {
-  if (!order.value || selectedIndexes.value.length === 0) {
+  if (!order.value || selectedKeys.value.length === 0) {
     showFailToast('请先勾选要发货的商品')
     return
   }
@@ -707,8 +939,10 @@ onMounted(async () => {
   try {
     await loadOptions()
     order.value = id ? await loadOrder(id) : null
-    // 默认不勾选，需用户主动勾选后才能发货
-    selectedIndexes.value = []
+    if (order.value) await initShipPickSelection(order.value)
+    if (route.query.split === '1' && order.value) {
+      await openSplitEdit()
+    }
   } catch (e: any) {
     showFailToast(e.message || '加载失败')
   } finally {
@@ -734,6 +968,107 @@ onMounted(async () => {
   font-size: 12px;
   font-weight: 500;
   color: var(--ops-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.link-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--ops-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.link-btn--danger {
+  color: #dc2626;
+}
+.tag-split {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #047857;
+  background: #d1fae5;
+  padding: 1px 6px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.goods-row--pick {
+  align-items: flex-start;
+}
+.goods-row__check {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin-top: 2px;
+  cursor: pointer;
+}
+.qty-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.split-sheet {
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  overflow: auto;
+  padding-bottom: 72px;
+}
+.split-block {
+  margin-top: 8px;
+}
+.split-block__hd {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.split-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ops-line);
+}
+.split-item__hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.split-item__hd img {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.split-item__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.split-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.split-line :deep(.van-field) {
+  flex: 1;
+  padding: 4px 8px;
+  background: #f5f6f8;
+  border-radius: 8px;
+}
+.split-sheet__foot {
+  position: sticky;
+  bottom: 0;
+  margin-top: 12px;
+  padding: 8px 0 calc(8px + var(--ops-safe-bottom));
+  background: linear-gradient(180deg, transparent, #fff 28%);
 }
 .order-hero__top {
   display: flex;

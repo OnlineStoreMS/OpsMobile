@@ -57,6 +57,8 @@ export interface ShipperProfile {
 
 export interface OrderGoods {
   orderItemId?: number
+  /** 发货计划行 ID（拆分规格） */
+  planLineId?: number
   title: string
   skuName: string
   num: number
@@ -172,6 +174,9 @@ export interface OMSOrderItem {
   price?: number
   totalAmount?: number
   picUrl?: string
+  parentOrderItemId?: number
+  splitKind?: '' | 'partial' | 'full'
+  shipPlanLineId?: number
 }
 
 export interface OMSOrderShipmentItem {
@@ -221,6 +226,28 @@ export interface OMSOrder {
   items?: OMSOrderItem[]
   address?: OMSOrderAddress
   shipments?: OMSOrderShipment[]
+  /** 待发拆分段数（前端写入） */
+  pendingPlanCount?: number
+  /** 发货计划行 */
+  shipPlanLines?: ShipPlanLine[]
+}
+
+export interface ShipPlanLine {
+  id: number
+  orderCoreId: number
+  orderItemId: number
+  splitOrderItemId?: number
+  skuName: string
+  qty: number
+  sortNo: number
+  status: string
+}
+
+export interface ShipPlanLineInput {
+  orderItemId: number
+  skuName: string
+  qty: number
+  sortNo?: number
 }
 
 export async function listPendingOmsOrders(params: {
@@ -335,6 +362,20 @@ export const shippingApi = {
   /** 手动/快递助手回填运单号发货（支持勾选部分商品） */
   confirmKdzsShip: (body: ConfirmKdzsShipInput) =>
     shippingClient.post('/shipments/confirm-kdzs-ship', body).then((r) => unwrap<Shipment>(r)),
+  getShipPlan: (orderId: number, status?: string) =>
+    shippingClient
+      .get(`/orders/${orderId}/ship-plan`, { params: status ? { status } : undefined })
+      .then((r) => unwrap<{ list: ShipPlanLine[]; total: number }>(r)),
+  putShipPlan: (orderId: number, lines: ShipPlanLineInput[]) =>
+    shippingClient
+      .put(`/orders/${orderId}/ship-plan`, { lines })
+      .then((r) => unwrap<{ list: ShipPlanLine[]; total: number }>(r)),
+  countPendingShipPlans: (orderIds: number[]) =>
+    shippingClient
+      .get('/ship-plan/pending-counts', {
+        params: { orderIds: orderIds.filter((id) => id > 0).join(',') },
+      })
+      .then((r) => unwrap<{ counts: Record<string, number> }>(r)),
   /** 出单后预计派送时间 EXP_RECE_SEARCH_PROMITM */
   searchPromiseTm: (id: number) =>
     shippingClient.get(`/shipments/${id}/promise-tm`).then((r) =>

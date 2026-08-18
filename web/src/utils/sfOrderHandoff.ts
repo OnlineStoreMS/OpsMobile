@@ -1,4 +1,4 @@
-import type { OMSOrder, OrderGoods, OrderSnapshot } from '../api/shipping'
+import type { OMSOrder, OrderGoods, OrderSnapshot, ShipPlanLine } from '../api/shipping'
 
 export const SF_ORDER_HANDOFF_KEY = 'shippingcore.sfOrder.handoff'
 export const LAST_CARRIER_KEY = 'opsmobile.ship.lastCarrierAccountId'
@@ -13,6 +13,29 @@ export interface SFOrderHandoff {
   shipperProfileId?: number
   /** 本次为部分发货勾选，下单成功后回到「部分发货」列表 */
   partialShip?: boolean
+}
+
+/** 订单中心拆分子行：列表/勾选由计划行承载 */
+export function isOMSSplitChild(it?: { splitKind?: string; parentOrderItemId?: number } | null) {
+  if (!it) return false
+  return !!(it.splitKind || (it.parentOrderItemId && it.parentOrderItemId > 0))
+}
+
+export function rootOMSItems(order?: OMSOrder | null) {
+  return (order?.items || []).filter((it) => !isOMSSplitChild(it))
+}
+
+function isShippableOMSItem(
+  order: OMSOrder,
+  it: NonNullable<OMSOrder['items']>[number],
+): boolean {
+  if (it.splitKind === 'partial' || it.splitKind === 'full') return true
+  const items = order.items || []
+  if (items.some((x) => x.splitKind === 'full')) return false
+  if (it.id && items.some((x) => x.splitKind === 'partial' && x.parentOrderItemId === it.id)) {
+    return false
+  }
+  return true
 }
 
 /** 订单行已发数量（有明细运单时按明细；无明细且整单已发完时视为全部已发） */
@@ -30,7 +53,7 @@ export function shippedQtyByItem(order: OMSOrder): Record<number, number> {
   }
   if (!hasItemRows && (order.shipments || []).length > 0 && order.shipStatus === 'shipped') {
     for (const it of order.items || []) {
-      if (it.id) map[it.id] = it.quantity || 0
+      if (it.id && isShippableOMSItem(order, it)) map[it.id] = it.quantity || 0
     }
   }
   return map
@@ -41,12 +64,15 @@ export function remainingQtyByItem(order: OMSOrder): Record<number, number> {
   const out: Record<number, number> = {}
   for (const it of order.items || []) {
     if (!it.id) continue
+    if (!isShippableOMSItem(order, it)) {
+      out[it.id] = 0
+      continue
+    }
     out[it.id] = Math.max(0, (it.quantity || 0) - (shipped[it.id] || 0))
   }
   return out
 }
 
-/** itemIndexes：按订单明细下标勾选发货；不传则全部可发商品 */
 /** 从整段中文地址尽量拆出省/市/区与明细（OMS 常只给 fullText）。 */
 export function parseChineseRegion(raw: string): {
   province: string
@@ -109,6 +135,7 @@ export function omsOrderToSnapshot(
           .filter(Boolean)
       : all.filter((g) => {
           if (!g.id) return true
+          if (!isShippableOMSItem(order, g)) return false
           const left = remaining[g.id]
           return left == null || left > 0
         })
@@ -134,7 +161,6 @@ export function omsOrderToSnapshot(
         const product = (g.productName || '').trim()
         const id = g.id || 0
         const left = id ? remaining[id] : undefined
-        // 已发完的行不进入快照（避免回写时把部分发货标成全部已发）
         if (id && left != null && left <= 0) return null
         const num =
           left != null && left > 0
@@ -153,6 +179,209 @@ export function omsOrderToSnapshot(
       })
       .filter((g): g is NonNullable<typeof g> => !!g),
   }
+}
+
+/** 按勾选的可发货行生成快照（含拆分计划行） */
+export function buildShipPickSnapshot(
+  order: OMSOrder,
+  rows: Array<{
+    orderItemId: number
+    planLineId?: number
+    skuName: string
+    shipQty: number
+    maxQty: number
+  }>,
+): OrderSnapshot {
+  const base = omsOrderToSnapshot(order, { itemIndexes: [] })
+  const goods: OrderGoods[] = []
+  for (const r of rows) {
+    const spec = (r.skuName || '').trim()
+    const need = Math.min(Math.max(1, r.shipQty || 1), Math.max(1, r.maxQty || 1))
+    if (!(r.orderItemId > 0)) {
+      throw new Error(`「${spec || '规格'}」尚未同步订单中心子行，请重新保存拆分后再打单`)
+    }
+    goods.push({
+      orderItemId: r.orderItemId,
+      planLineId: r.planLineId || 0,
+      title: spec,
+      skuName: spec,
+      num: need,
+      outerId: '',
+      price: 0,
+    })
+  }
+  return { ...base, goods }
+}
+
+/** 列表/详情商品展示：有拆分计划时用规格行替换被拆原商品 */
+export function orderGoodsDisplayRows(order: OMSOrder) {
+  const shippedMap = shippedQtyByItem(order)
+  const plans = order.shipPlanLines || []
+  const pendingPlans = plans.filter((l) => l.status === 'pending')
+  const shippedPlans = plans.filter((l) => l.status === 'shipped')
+  const isFullOrderPlan =
+    pendingPlans.some((l) => !l.orderItemId) ||
+    (pendingPlans.length === 0 &&
+      shippedPlans.length > 0 &&
+      shippedPlans.every((l) => !l.orderItemId))
+
+  type Row = {
+    key: string
+    title: string
+    picUrl?: string
+    shipped: number
+    total: number
+    fullyShipped: boolean
+    isSplit: boolean
+  }
+  const rows: Row[] = []
+  const rootItems = rootOMSItems(order)
+
+  if (isFullOrderPlan) {
+    for (const p of [...pendingPlans, ...shippedPlans]) {
+      const qty = Math.max(1, p.qty || 1)
+      const done = p.status === 'shipped'
+      rows.push({
+        key: `plan:${p.id}`,
+        title: `${(p.skuName || '').trim() || `规格#${p.id}`} ×${qty}`,
+        shipped: done ? qty : 0,
+        total: qty,
+        fullyShipped: done,
+        isSplit: true,
+      })
+    }
+    return rows
+  }
+
+  if (plans.length) {
+    const covered = new Set(plans.map((l) => l.orderItemId).filter((id) => id > 0))
+    for (const p of pendingPlans) {
+      const qty = Math.max(1, p.qty || 1)
+      const item = rootItems.find((it) => it.id === p.orderItemId)
+      rows.push({
+        key: `plan:${p.id}`,
+        title: `${(p.skuName || '').trim() || `规格#${p.id}`} ×${qty}`,
+        picUrl: item?.picUrl,
+        shipped: 0,
+        total: qty,
+        fullyShipped: false,
+        isSplit: true,
+      })
+    }
+    for (const p of shippedPlans) {
+      if (!p.orderItemId) continue
+      const qty = Math.max(1, p.qty || 1)
+      const item = rootItems.find((it) => it.id === p.orderItemId)
+      rows.push({
+        key: `plan-shipped:${p.id}`,
+        title: `${(p.skuName || '').trim() || `规格#${p.id}`} ×${qty}`,
+        picUrl: item?.picUrl,
+        shipped: qty,
+        total: qty,
+        fullyShipped: true,
+        isSplit: true,
+      })
+    }
+    rootItems.forEach((g, idx) => {
+      if (g.id && covered.has(g.id)) return
+      const shipped = g.id ? shippedMap[g.id] || 0 : 0
+      const total = g.quantity || 0
+      const name = (g.skuSpecs || g.productName || '商品').trim()
+      rows.push({
+        key: `item:${idx}`,
+        title: total > 1 ? `${name} ×${total}` : name,
+        picUrl: g.picUrl,
+        shipped,
+        total,
+        fullyShipped: shipped > 0 && total > 0 && shipped >= total,
+        isSplit: false,
+      })
+    })
+    return rows
+  }
+
+  return rootItems.map((g, idx) => {
+    const shipped = g.id ? shippedMap[g.id] || 0 : 0
+    const total = g.quantity || 0
+    const name = (g.skuSpecs || g.productName || '商品').trim()
+    return {
+      key: `item:${idx}`,
+      title: total > 1 ? `${name} ×${total}` : name,
+      picUrl: g.picUrl,
+      shipped,
+      total,
+      fullyShipped: shipped > 0 && total > 0 && shipped >= total,
+      isSplit: false,
+    }
+  })
+}
+
+export function formatOrderGoodsSummary(order: OMSOrder): string {
+  const rows = orderGoodsDisplayRows(order)
+  if (!rows.length) return '-'
+  const first = rows[0].title
+  if (rows.length > 1) return `${first} 等${rows.length}行`
+  return first
+}
+
+export function buildShipPickRows(order: OMSOrder, planLines: ShipPlanLine[]) {
+  const remaining = remainingQtyByItem(order)
+  const pending = planLines.filter((l) => l.status === 'pending')
+  type Row = {
+    key: string
+    kind: 'plan' | 'item'
+    planLineId?: number
+    orderItemId: number
+    itemIndex?: number
+    label: string
+    skuName: string
+    maxQty: number
+    shipQty: number
+    picUrl?: string
+  }
+  const rows: Row[] = []
+
+  for (const line of pending) {
+    const item = (order.items || []).find((it) => it.id === line.orderItemId)
+    const spec = (line.skuName || '').trim()
+    const maxQty = Math.max(1, line.qty || 1)
+    rows.push({
+      key: `plan:${line.id}`,
+      kind: 'plan',
+      planLineId: line.id,
+      orderItemId: line.splitOrderItemId || line.orderItemId || 0,
+      label: spec || item?.productName || `规格#${line.id}`,
+      skuName: spec,
+      maxQty,
+      shipQty: maxQty,
+      picUrl: item?.picUrl,
+    })
+  }
+
+  const isFullOrderPlan = pending.some((l) => !l.orderItemId)
+  if (isFullOrderPlan) return rows
+
+  const covered = new Set(pending.map((l) => l.orderItemId).filter((id) => id > 0))
+  rootOMSItems(order).forEach((item, index) => {
+    if (!item?.id || covered.has(item.id)) return
+    const left = remaining[item.id] ?? item.quantity ?? 0
+    if (left <= 0) return
+    const spec = (item.skuSpecs || '').trim()
+    const product = (item.productName || '').trim()
+    const name = spec || product || `商品#${item.id}`
+    rows.push({
+      key: `item:${item.id || index}`,
+      kind: 'item',
+      orderItemId: item.id,
+      itemIndex: index,
+      label: name,
+      skuName: name,
+      maxQty: left,
+      shipQty: left,
+      picUrl: item.picUrl,
+    })
+  })
+  return rows
 }
 
 export function saveSFOrderHandoff(payload: SFOrderHandoff) {
@@ -196,7 +425,6 @@ export function goodsCargoName(goods: OrderGoods[]): string {
 }
 
 export function goodsParcelQty(_goods: OrderGoods[]): number {
-  // 多商品默认同装一包；顺丰 >1 才是子母件
   return 1
 }
 
@@ -214,11 +442,11 @@ export function parsePastedContact(text: string): {
   if (mobile) rest = rest.replace(mobile, ' ').replace(/[,，]/g, ' ').replace(/\s+/g, ' ').trim()
   const parts = rest.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
   if (parts.length >= 2) {
-    return { name: parts[0], mobile, address: parts.slice(1).join('') }
+    return { name: parts[0], mobile, address: parts.slice(1).join(' ') }
   }
   const tokens = rest.split(' ').filter(Boolean)
   if (tokens.length >= 2) {
-    return { name: tokens[0], mobile, address: tokens.slice(1).join('') }
+    return { name: tokens[0], mobile, address: tokens.slice(1).join(' ') }
   }
   return { name: rest || undefined, mobile }
 }
