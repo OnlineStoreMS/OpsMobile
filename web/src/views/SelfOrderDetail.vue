@@ -29,22 +29,34 @@
 
       <div class="section-label">商品</div>
       <div class="card">
-        <div v-for="it in detail.items || []" :key="it.id" class="goods-row">
-          <img v-if="it.picUrl" :src="it.picUrl" alt="" />
+        <div
+          v-for="row in goodsTreeRows"
+          :key="row.key"
+          class="goods-row"
+          :class="{ 'goods-row--child': row.isSplitChild, 'goods-row--header': row.fullGroupHeader }"
+        >
+          <img v-if="!row.fullGroupHeader && row.item.picUrl" :src="row.item.picUrl" alt="" />
+          <div v-else class="goods-pic-placeholder">{{ row.isSplitChild ? '└' : '' }}</div>
           <div class="goods-info">
-            <div class="goods-name">{{ it.productName }}</div>
-            <div class="muted">{{ it.skuSpecs || it.skuCode }} · ×{{ it.qty }} · ¥{{ Number(it.saleAmount || 0).toFixed(2) }}</div>
-            <div class="goods-logistics">
-              <template v-if="logisticsByItem.get(it.id)?.length">
-                <div v-for="(t, i) in logisticsByItem.get(it.id)" :key="i" class="goods-logistics__line">
+            <div class="goods-name">
+              <span v-if="row.isSplitChild" class="tree-prefix">└ </span>
+              {{ selfGoodsTitle(row) }}
+              <span v-if="row.isSplitParent" class="split-badge">已拆分</span>
+              <span v-else-if="row.isSplitChild" class="split-badge split-badge--child">拆分</span>
+            </div>
+            <div v-if="selfGoodsMeta(row)" class="muted">{{ selfGoodsMeta(row) }}</div>
+            <div v-if="!row.fullGroupHeader" class="goods-logistics">
+              <template v-if="logisticsByItem.get(row.item.id)?.length">
+                <div v-for="(t, i) in logisticsByItem.get(row.item.id)" :key="i" class="goods-logistics__line">
                   {{ t }}
                 </div>
               </template>
+              <span v-else-if="row.isSplitParent" class="muted goods-logistics__empty">见拆分行</span>
               <span v-else class="muted goods-logistics__empty">未发货</span>
             </div>
           </div>
         </div>
-        <div v-if="!detail.items?.length" class="muted">无商品行</div>
+        <div v-if="!goodsTreeRows.length" class="muted">无商品行</div>
       </div>
 
       <template v-if="showPaymentSection">
@@ -236,6 +248,7 @@ import {
   labelSelfPayStatus,
   deriveSelfShipStatus,
 } from '../utils/labels'
+import { buildSelfGoodsTreeRows, selfGoodsMeta, selfGoodsTitle } from '../utils/selfGoodsTree'
 
 const route = useRoute()
 const router = useRouter()
@@ -273,6 +286,8 @@ const itemById = computed(() => {
   }
   return map
 })
+
+const goodsTreeRows = computed(() => buildSelfGoodsTreeRows(detail.value?.items))
 
 const logisticsByItem = computed(() => {
   const map = new Map<number, string[]>()
@@ -595,6 +610,40 @@ onMounted(async () => {
 .goods-name {
   font-weight: 600;
   font-size: 14px;
+}
+.goods-row--child {
+  padding-left: 8px;
+}
+.goods-row--header .goods-name {
+  color: var(--ops-muted);
+  font-weight: 500;
+}
+.goods-pic-placeholder {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ops-muted);
+  font-size: 16px;
+}
+.tree-prefix {
+  color: var(--ops-muted);
+  font-weight: 500;
+}
+.split-badge {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #b45309;
+  background: #fff7ed;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.split-badge--child {
+  color: #475569;
+  background: #f1f5f9;
 }
 .goods-logistics {
   margin-top: 6px;

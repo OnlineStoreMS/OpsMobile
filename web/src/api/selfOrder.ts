@@ -49,6 +49,8 @@ export interface SelfOrderDetail {
     saleUnitPrice: number
     saleAmount: number
     picUrl?: string
+    parentSelfOrderItemId?: number
+    splitKind?: '' | 'partial' | 'full'
   }>
 }
 
