@@ -6,8 +6,9 @@
       <div class="hub-header__right">
         <div v-if="displayName" class="hub-header__account" :title="accountTitle">
           <span class="hub-header__user">{{ displayName }}</span>
-          <span v-if="tenantName" class="hub-header__sep">·</span>
-          <span v-if="tenantName" class="hub-header__tenant">{{ tenantName }}</span>
+          <span v-if="tenantName || showTenantSwitch" class="hub-header__sep">·</span>
+          <TenantSwitcher v-if="showTenantSwitch" variant="header" />
+          <span v-else-if="tenantName" class="hub-header__tenant">{{ tenantName }}</span>
         </div>
         <button type="button" class="hub-header__logout" @click="onLogout">退出</button>
       </div>
@@ -20,7 +21,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { showConfirmDialog } from 'vant'
-import { fetchSession, logout } from '../utils/auth'
+import TenantSwitcher from './TenantSwitcher.vue'
+import { useSession } from '../composables/useSession'
+import { logout } from '../utils/auth'
 
 const props = withDefaults(
   defineProps<{
@@ -32,11 +35,12 @@ const props = withDefaults(
   { subtitle: '', tone: 'default' },
 )
 
-const displayName = ref('')
-const tenantName = ref('')
+const { session, showTenantSwitch, load } = useSession()
 const loggingOut = ref(false)
 
 const toneClass = computed(() => (props.tone !== 'default' ? `hub-header--${props.tone}` : ''))
+const displayName = computed(() => session.value?.user.displayName || session.value?.user.email || '')
+const tenantName = computed(() => session.value?.tenant.name || '')
 const accountTitle = computed(() =>
   [displayName.value, tenantName.value].filter(Boolean).join(' · '),
 )
@@ -57,12 +61,8 @@ async function onLogout() {
   await logout()
 }
 
-onMounted(async () => {
-  const s = await fetchSession()
-  if (s) {
-    displayName.value = s.user.displayName || s.user.email
-    tenantName.value = s.tenant.name
-  }
+onMounted(() => {
+  void load()
 })
 </script>
 

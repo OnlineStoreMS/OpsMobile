@@ -1,5 +1,7 @@
 <template>
   <div class="main-shell">
+    <TenantSwitcher v-if="showTenantSwitch && !isHub" class="global-tenant-switch" variant="bar" />
+
     <!-- N 个顶层大页：左右滑切换（配置见 hubPages.ts） -->
     <div v-show="isHub" class="hub-pager">
       <van-swipe
@@ -11,7 +13,7 @@
         :initial-swipe="hubIndex"
         @change="onHubChange"
       >
-        <van-swipe-item v-for="hub in hubPages" :key="hub.path">
+        <van-swipe-item v-for="hub in hubPages" :key="`${tenantKey}-${hub.path}`">
           <div class="hub-pane">
             <component :is="hub.component" />
           </div>
@@ -37,7 +39,7 @@
           @after-enter="onSlideUnlock"
           @after-leave="onSlideUnlock"
         >
-          <component :is="Component" :key="r.fullPath" />
+          <component :is="Component" :key="`${tenantKey}-${r.fullPath}`" />
         </transition>
       </router-view>
     </div>
@@ -45,15 +47,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { SwipeInstance } from 'vant'
+import TenantSwitcher from '../components/TenantSwitcher.vue'
+import { useSession } from '../composables/useSession'
 import { hubIndexByPath, hubPages, isHubPath } from '../hubPages'
 
 const route = useRoute()
 const router = useRouter()
+const { session, showTenantSwitch, load } = useSession()
 const swipeRef = ref<SwipeInstance>()
 const hubIndex = ref(hubIndexByPath(route.path))
+
+const tenantKey = computed(() => session.value?.tenant.id ?? 0)
 
 const isHub = computed(() => Boolean(route.meta.hub) || isHubPath(route.path))
 
@@ -166,6 +173,10 @@ router.beforeEach((to, from) => {
 router.afterEach(() => {
   lastPos = histPos() ?? lastPos
 })
+
+onMounted(() => {
+  void load(true)
+})
 </script>
 
 <style scoped>
@@ -241,5 +252,13 @@ router.afterEach(() => {
 /* 左右滑动画中短暂锁滚动，避免双层滚动；动画结束后恢复 */
 .deep-layer--locking {
   overflow: hidden;
+}
+
+.global-tenant-switch {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top));
+  right: 12px;
+  z-index: 30;
+  max-width: calc(100vw - 24px);
 }
 </style>

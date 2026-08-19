@@ -1,14 +1,55 @@
 import { getPortalUrl } from './runtimeConfig'
 
+const SESSION_CACHE_KEY = 'uc_session_profile'
+
 let sessionVerified = false
 let refreshPromise: Promise<boolean> | null = null
 let ensurePromise: Promise<boolean> | null = null
+
+export interface SessionUser {
+  id: number
+  email: string
+  displayName: string
+  isPlatform: boolean
+}
+
+export interface SessionTenant {
+  id: number
+  companyId?: number
+  name: string
+  code: string
+}
+
+export interface SessionInfo {
+  user: SessionUser
+  tenant: SessionTenant
+  tenants: SessionTenant[]
+}
 
 export function clearToken() {
   localStorage.removeItem('uc_access_token')
   localStorage.removeItem('uc_refresh_token')
   localStorage.removeItem('uc_expires_at')
+  sessionStorage.removeItem(SESSION_CACHE_KEY)
   sessionVerified = false
+}
+
+export function resetSessionVerification() {
+  sessionVerified = false
+}
+
+export function saveSessionCache(info: SessionInfo) {
+  sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(info))
+}
+
+export function loadSessionCache(): SessionInfo | null {
+  const raw = sessionStorage.getItem(SESSION_CACHE_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as SessionInfo
+  } catch {
+    return null
+  }
 }
 
 export function redirectToPortal() {
@@ -43,6 +84,18 @@ function readJwtExp(token: string): number | undefined {
   }
 }
 
+function normalizeSession(data: {
+  user: SessionUser
+  tenant: SessionTenant
+  tenants?: SessionTenant[]
+}): SessionInfo {
+  return {
+    user: data.user,
+    tenant: data.tenant,
+    tenants: data.tenants?.length ? data.tenants : [data.tenant],
+  }
+}
+
 export async function tryRefreshAccessToken(): Promise<boolean> {
   if (refreshPromise) return refreshPromise
   refreshPromise = (async () => {
@@ -67,19 +120,40 @@ export async function tryRefreshAccessToken(): Promise<boolean> {
   return refreshPromise
 }
 
-export async function fetchSession(): Promise<{
-  user: { id: number; email: string; displayName: string }
-  tenant: { id: number; name: string; code: string }
-} | null> {
+export async function fetchSession(): Promise<SessionInfo | null> {
   try {
     const res = await fetch(`${iamBase()}/auth/me`, { credentials: 'include' })
     if (!res.ok) return null
     const body = await res.json()
     if (body.code !== 200 || !body.data) return null
-    return body.data
+    const info = normalizeSession(body.data)
+    saveSessionCache(info)
+    return info
   } catch {
     return null
   }
+}
+
+export async function switchTenant(tenantId: number): Promise<SessionInfo> {
+  const res = await fetch(`${iamBase()}/auth/switch-tenant`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tenantId }),
+  })
+  const body = await res.json()
+  if (body.code !== 200 || !body.data) {
+    throw new Error(body.message || '切换租户失败')
+  }
+  if (body.data.accessToken) {
+    saveAuthTokens(body.data.accessToken, body.data.refreshToken, body.data.expiresAt)
+  } else if (body.data.expiresAt) {
+    saveAuthTokens('', undefined, body.data.expiresAt)
+  }
+  resetSessionVerification()
+  const info = normalizeSession(body.data)
+  saveSessionCache(info)
+  return info
 }
 
 function sleep(ms: number) {
@@ -92,14 +166,12 @@ export async function ensureSession(): Promise<boolean> {
   if (ensurePromise) return ensurePromise
 
   ensurePromise = (async () => {
-    // 1) 直接读会话（cookie）
     let info = await fetchSession()
     if (info) {
       sessionVerified = true
       return true
     }
 
-    // 2) 登录刚 Set-Cookie 后偶发首请求未带上，短等再试
     await sleep(200)
     info = await fetchSession()
     if (info) {
@@ -107,7 +179,6 @@ export async function ensureSession(): Promise<boolean> {
       return true
     }
 
-    // 3) 用 refresh cookie 续期后再读
     const refreshed = await tryRefreshAccessToken()
     if (refreshed) {
       info = await fetchSession()

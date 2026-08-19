@@ -27,7 +27,10 @@
             :class="{ 'status-chip--on': shipStatus === opt.value }"
             @click="setShipStatus(opt.value)"
           >
-            {{ opt.label }}
+            <span>{{ opt.label }}</span>
+            <span v-if="showFilterCounts && shipCountOf(opt.value) != null" class="chip-count">
+              {{ shipCountOf(opt.value) }}
+            </span>
           </button>
         </div>
         <div class="status-bar">
@@ -39,7 +42,10 @@
             :class="{ 'status-chip--on': sourceChannel === opt.value }"
             @click="setSourceChannel(opt.value)"
           >
-            {{ opt.label }}
+            <span>{{ opt.label }}</span>
+            <span v-if="showFilterCounts && typeCountOf(opt.value) != null" class="chip-count">
+              {{ typeCountOf(opt.value) }}
+            </span>
           </button>
         </div>
       </div>
@@ -316,6 +322,8 @@ const allocForm = reactive({
 const batchSupplierId = ref(0)
 const batchSupplierName = ref('')
 const decryptRow = reactive<Record<number, boolean>>({})
+const shipCounts = ref<Record<string, number>>({})
+const typeCounts = ref<Record<string, number>>({})
 
 const statusFilter = computed(() => {
   const s = route.query.status
@@ -328,8 +336,70 @@ const navTitle = computed(() => {
   return '全部订单'
 })
 
+const showFilterCounts = computed(() => !statusFilter.value)
+
 const shipTabs = SHIP_STATUS_OPTIONS
 const typeTabs = ORDER_TYPE_OPTIONS
+
+function shipCountOf(value: string) {
+  if (!showFilterCounts.value) return null
+  return value in shipCounts.value ? shipCounts.value[value] : null
+}
+
+function typeCountOf(value: string) {
+  if (!showFilterCounts.value) return null
+  return value in typeCounts.value ? typeCounts.value[value] : null
+}
+
+function baseCountParams() {
+  const { start, end } = toApiDateTimeRange(rangeStart.value, rangeEnd.value)
+  const kw = keyword.value.trim()
+  return {
+    keyword: kw || undefined,
+    orderedAtStart: kw ? undefined : start,
+    orderedAtEnd: kw ? undefined : end,
+    page: 1,
+    pageSize: 1,
+  }
+}
+
+async function loadFilterCounts() {
+  if (!showFilterCounts.value) {
+    shipCounts.value = {}
+    typeCounts.value = {}
+    return
+  }
+  const base = baseCountParams()
+  try {
+    const [shipResults, typeResults] = await Promise.all([
+      Promise.all(
+        SHIP_STATUS_OPTIONS.map(async (opt) => {
+          const res = await omsApi.listOrders({
+            ...base,
+            sourceChannel: sourceChannel.value || undefined,
+            shipStatus: opt.value || undefined,
+          })
+          return [opt.value, res.total || 0] as const
+        }),
+      ),
+      Promise.all(
+        ORDER_TYPE_OPTIONS.map(async (opt) => {
+          const res = await omsApi.listOrders({
+            ...base,
+            shipStatus: shipStatus.value || undefined,
+            sourceChannel: opt.value || undefined,
+          })
+          return [opt.value, res.total || 0] as const
+        }),
+      ),
+    ])
+    shipCounts.value = Object.fromEntries(shipResults)
+    typeCounts.value = Object.fromEntries(typeResults)
+  } catch {
+    shipCounts.value = {}
+    typeCounts.value = {}
+  }
+}
 
 function formatTime(v?: string) {
   if (!v) return ''
@@ -645,6 +715,7 @@ function reload() {
   page.value = 1
   finished.value = false
   list.value = []
+  void loadFilterCounts()
   void loadMore()
 }
 
@@ -689,6 +760,9 @@ watch(
 }
 .status-chip {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: 1px solid rgba(15, 31, 42, 0.1);
   background: #fff;
   color: var(--ops-muted);
@@ -696,6 +770,21 @@ watch(
   font-weight: 600;
   padding: 6px 12px;
   border-radius: 999px;
+}
+.chip-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(15, 31, 42, 0.08);
+  color: var(--ops-ink-soft);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.status-chip--on .chip-count {
+  background: rgba(15, 118, 110, 0.18);
+  color: var(--ops-primary);
 }
 .status-chip--on {
   color: var(--ops-primary);
