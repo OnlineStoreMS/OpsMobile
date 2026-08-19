@@ -7,6 +7,7 @@ import {
 } from '../utils/auth'
 
 const session = ref<SessionInfo | null>(loadSessionCache())
+const tenantSheetOpen = ref(false)
 
 export function useSession() {
   const showTenantSwitch = computed(() => {
@@ -15,9 +16,9 @@ export function useSession() {
   })
 
   async function load(force = false) {
-    if (!force && session.value) return session.value
+    if (!force && session.value?.tenants?.length) return session.value
     const cached = loadSessionCache()
-    if (!force && cached) {
+    if (!force && cached?.tenants?.length) {
       session.value = cached
       return cached
     }
@@ -26,10 +27,21 @@ export function useSession() {
     return info
   }
 
+  async function openTenantSheet() {
+    await load(true)
+    if (!showTenantSwitch.value) return
+    tenantSheetOpen.value = true
+  }
+
+  function closeTenantSheet() {
+    tenantSheetOpen.value = false
+  }
+
   async function switchToTenant(tenantId: number) {
     if (tenantId === session.value?.tenant.id) return session.value
     const info = await switchTenant(tenantId)
     session.value = info
+    tenantSheetOpen.value = false
     const base = import.meta.env.BASE_URL || '/'
     window.location.replace(base.endsWith('/') ? base : `${base}/`)
     return info
@@ -37,8 +49,11 @@ export function useSession() {
 
   return {
     session,
+    tenantSheetOpen,
     showTenantSwitch,
     load,
+    openTenantSheet,
+    closeTenantSheet,
     switchToTenant,
   }
 }

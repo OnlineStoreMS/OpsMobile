@@ -7,7 +7,7 @@
         <div v-if="displayName" class="hub-header__account" :title="accountTitle">
           <span class="hub-header__user">{{ displayName }}</span>
           <span v-if="tenantName || showTenantSwitch" class="hub-header__sep">·</span>
-          <TenantSwitcher v-if="showTenantSwitch" variant="header" />
+          <TenantSwitchTrigger v-if="showTenantSwitch" />
           <span v-else-if="tenantName" class="hub-header__tenant">{{ tenantName }}</span>
         </div>
         <button type="button" class="hub-header__logout" @click="onLogout">退出</button>
@@ -21,7 +21,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { showConfirmDialog } from 'vant'
-import TenantSwitcher from './TenantSwitcher.vue'
+import TenantSwitchTrigger from './TenantSwitchTrigger.vue'
 import { useSession } from '../composables/useSession'
 import { logout } from '../utils/auth'
 

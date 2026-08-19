@@ -1,5 +1,7 @@
 <template>
   <div class="main-shell">
+    <TenantSwitchSheet />
+
     <!-- N 个顶层大页：左右滑切换（配置见 hubPages.ts） -->
     <div v-show="isHub" class="hub-pager">
       <van-swipe
@@ -48,6 +50,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { SwipeInstance } from 'vant'
+import TenantSwitchSheet from '../components/TenantSwitchSheet.vue'
 import { useSession } from '../composables/useSession'
 import { hubIndexByPath, hubPages, isHubPath } from '../hubPages'
 
