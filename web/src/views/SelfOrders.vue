@@ -64,7 +64,7 @@
           </div>
           <div class="order-card__meta">
             <div>来源 <strong>{{ formatOrderSource(row) }}</strong></div>
-            <div>{{ row.skuSpecs || `${row.itemCount || 0} 件商品` }}</div>
+            <div class="order-card__specs">{{ row.skuSpecs || `${row.itemCount || 0} 件商品` }}</div>
           </div>
           <div class="order-card__foot">
             <div class="order-card__price">¥{{ Number(row.saleAmount || 0).toFixed(2) }}</div>
@@ -358,6 +358,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.order-card__specs {
+  margin-top: 2px;
+  line-height: 1.45;
+  word-break: break-word;
+  color: var(--ops-text, #1f2937);
 }
 .order-card__actions {
   display: flex;

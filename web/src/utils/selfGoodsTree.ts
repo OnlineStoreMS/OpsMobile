@@ -16,13 +16,9 @@ export type SelfGoodsTreeRow = {
   item: SelfGoodsItem
   isSplitChild: boolean
   isSplitParent: boolean
-  fullGroupHeader?: boolean
 }
 
-function isSplitChild(it: SelfGoodsItem) {
-  return !!(it.splitKind || (it.parentSelfOrderItemId && it.parentSelfOrderItemId > 0))
-}
-
+/** 详情/物流：根行 + └ 拆分子行（对齐 SelfCore 电脑端） */
 export function buildSelfGoodsTreeRows(items: SelfGoodsItem[] | undefined): SelfGoodsTreeRow[] {
   if (!items?.length) return []
   const childrenByParent = new Map<number, SelfGoodsItem[]>()
@@ -59,36 +55,28 @@ export function buildSelfGoodsTreeRows(items: SelfGoodsItem[] | undefined): Self
       })
     }
   }
-  if (fullChildren.length) {
+  // 整单拆分：无父行，直接以拆分子行展示（与电脑端一致）
+  for (const ch of fullChildren) {
     out.push({
-      key: 'full-header',
-      item: { id: 0, productName: '整单拆分', qty: 0 },
-      isSplitChild: false,
+      key: `full-${ch.id}`,
+      item: ch,
+      isSplitChild: true,
       isSplitParent: false,
-      fullGroupHeader: true,
     })
-    for (const ch of fullChildren) {
-      out.push({
-        key: `full-${ch.id}`,
-        item: ch,
-        isSplitChild: true,
-        isSplitParent: false,
-      })
-    }
   }
   return out
 }
 
 export function selfGoodsTitle(row: SelfGoodsTreeRow): string {
   const it = row.item
-  if (row.fullGroupHeader) return '整单拆分'
-  if (row.isSplitChild) return (it.skuSpecs || it.productName || it.skuCode || '规格').trim() || '规格'
-  return (it.productName || it.skuCode || '商品').trim() || '商品'
+  if (row.isSplitChild) {
+    return (it.skuSpecs || it.productName || it.skuCode || '规格').trim() || '规格'
+  }
+  return (it.skuSpecs || it.productName || it.skuCode || '商品').trim() || '商品'
 }
 
 export function selfGoodsMeta(row: SelfGoodsTreeRow): string {
   const it = row.item
-  if (row.fullGroupHeader) return ''
   const title = selfGoodsTitle(row)
   const parts: string[] = []
   const spec = (it.skuSpecs || '').trim()

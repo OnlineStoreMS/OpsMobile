@@ -33,19 +33,19 @@
           v-for="row in goodsTreeRows"
           :key="row.key"
           class="goods-row"
-          :class="{ 'goods-row--child': row.isSplitChild, 'goods-row--header': row.fullGroupHeader }"
+          :class="{ 'goods-row--child': row.isSplitChild }"
         >
-          <img v-if="!row.fullGroupHeader && row.item.picUrl" :src="row.item.picUrl" alt="" />
-          <div v-else class="goods-pic-placeholder">{{ row.isSplitChild ? '└' : '' }}</div>
+          <img v-if="row.item.picUrl" :src="row.item.picUrl" alt="" />
+          <div v-else class="goods-pic-placeholder" aria-hidden="true" />
           <div class="goods-info">
-            <div class="goods-name">
-              <span v-if="row.isSplitChild" class="tree-prefix">└ </span>
-              {{ selfGoodsTitle(row) }}
+            <div class="goods-name" :class="{ 'goods-name--child': row.isSplitChild }">
+              <span v-if="row.isSplitChild" class="tree-prefix">└</span>
+              <span class="goods-name__text">{{ selfGoodsTitle(row) }}</span>
               <span v-if="row.isSplitParent" class="split-badge">已拆分</span>
               <span v-else-if="row.isSplitChild" class="split-badge split-badge--child">拆分</span>
             </div>
             <div v-if="selfGoodsMeta(row)" class="muted">{{ selfGoodsMeta(row) }}</div>
-            <div v-if="!row.fullGroupHeader" class="goods-logistics">
+            <div class="goods-logistics">
               <template v-if="logisticsByItem.get(row.item.id)?.length">
                 <div v-for="(t, i) in logisticsByItem.get(row.item.id)" :key="i" class="goods-logistics__line">
                   {{ t }}
@@ -607,33 +607,39 @@ onMounted(async () => {
   flex: 1;
   min-width: 0;
 }
-.goods-name {
-  font-weight: 600;
-  font-size: 14px;
-}
 .goods-row--child {
-  padding-left: 8px;
-}
-.goods-row--header .goods-name {
-  color: var(--ops-muted);
-  font-weight: 500;
+  padding-left: 12px;
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.03), transparent 48px);
 }
 .goods-pic-placeholder {
   width: 48px;
   height: 48px;
   flex-shrink: 0;
+  border-radius: 8px;
+  background: #f1f5f9;
+}
+.goods-name {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
-  color: var(--ops-muted);
-  font-size: 16px;
+  gap: 4px 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.goods-name--child {
+  font-weight: 550;
+}
+.goods-name__text {
+  min-width: 0;
+  word-break: break-word;
 }
 .tree-prefix {
   color: var(--ops-muted);
-  font-weight: 500;
+  font-weight: 400;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  line-height: 1;
 }
 .split-badge {
-  margin-left: 6px;
   font-size: 11px;
   font-weight: 500;
   color: #b45309;
