@@ -35,13 +35,30 @@
 
       <div class="section-label">收件信息</div>
       <div class="card">
-        <div>{{ addr.name || detail.buyerName || '-' }} · {{ addr.phone || detail.buyerPhone || '-' }}</div>
-        <div class="muted addr">
-          {{ [addr.province, addr.city, addr.district, addr.address].filter(Boolean).join(' ') || addr.fullText || '-' }}
-        </div>
+        <div class="muted addr">{{ formatAddress(detail.address) }}</div>
         <div class="addr-actions">
-          <van-button size="mini" plain hairline round type="primary" @click="decryptAddr">解密地址</van-button>
-          <van-button size="mini" plain hairline round @click="copyAddr">复制</van-button>
+          <van-button
+            v-if="canDecrypt"
+            size="mini"
+            plain
+            hairline
+            round
+            type="warning"
+            :loading="decrypting"
+            @click="decryptAddr"
+          >
+            {{ isMaskedReceiver(detail) ? '解密地址' : '重新解密' }}
+          </van-button>
+          <van-button
+            v-if="formatAddress(detail.address) !== '-'"
+            size="mini"
+            plain
+            hairline
+            round
+            @click="copyAddr"
+          >
+            复制地址规格
+          </van-button>
         </div>
       </div>
 
@@ -183,10 +200,18 @@ import {
   itemTreeTitle,
   splitKindLabel,
 } from '../../utils/orderItemTree'
+import { copyToClipboard } from '../../utils/clipboard'
+import {
+  buildOrderCopyText,
+  canDecryptOrder,
+  formatAddress,
+  isMaskedReceiver,
+} from '../../utils/orderCopy'
 
 const router = useRouter()
 const route = useRoute()
 const detail = ref<OmsOrder | null>(null)
+const decrypting = ref(false)
 const allocVisible = ref(false)
 const submitting = ref(false)
 const suppliers = ref<OmsSupplier[]>([])
@@ -198,7 +223,10 @@ const allocForm = reactive({
   supplierName: '',
 })
 
-const addr = computed(() => detail.value?.address || {})
+const canDecrypt = computed(() => {
+  const o = detail.value
+  return !!o && canDecryptOrder(o)
+})
 const itemTree = computed(() => buildItemTreeRows(detail.value?.items))
 const splitRows = computed(() => itemTree.value.filter((r) => r.isSplitChild && !r.fullGroupHeader))
 const shipments = computed(() => detail.value?.shipments || [])
@@ -266,32 +294,32 @@ async function load() {
 }
 
 async function decryptAddr() {
-  if (!detail.value) return
+  if (!detail.value || !canDecrypt.value) {
+    showFailToast('仅电商订单可解密')
+    return
+  }
+  decrypting.value = true
   try {
     const res = await omsApi.decryptOrders([detail.value.id])
-    const updated = res.items?.[0]
-    if (updated) detail.value = { ...detail.value, ...updated }
-    showSuccessToast('已解密')
+    if (res.items?.[0]) detail.value = res.items[0]
+    showSuccessToast('解密成功')
   } catch (e: any) {
     showFailToast(e.message || '解密失败')
+  } finally {
+    decrypting.value = false
   }
 }
 
 async function copyAddr() {
-  const a = addr.value
-  const text = [
-    a.name || detail.value?.buyerName || '',
-    a.phone || detail.value?.buyerPhone || '',
-    [a.province, a.city, a.district, a.address].filter(Boolean).join(' ') || a.fullText || '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-  try {
-    await navigator.clipboard.writeText(text)
-    showSuccessToast('已复制')
-  } catch {
-    showFailToast('复制失败')
+  if (!detail.value) return
+  const address = formatAddress(detail.value.address)
+  if (!address || address === '-') {
+    showFailToast('暂无收件信息，请先解密')
+    return
   }
+  const ok = await copyToClipboard(buildOrderCopyText(detail.value))
+  if (ok) showSuccessToast('已复制')
+  else showFailToast('复制失败')
 }
 
 async function openAlloc() {

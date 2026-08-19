@@ -82,8 +82,43 @@
             </div>
           </div>
 
-          <div class="receiver-line">
-            {{ row.buyerName || row.buyerNick || '-' }} · {{ row.buyerPhone || '-' }}
+          <div class="receiver-line">{{ formatAddress(row.address) }}</div>
+          <div v-if="canDecryptOrder(row)" class="addr-actions" @click.stop>
+            <van-button
+              v-if="isMaskedReceiver(row)"
+              size="mini"
+              plain
+              hairline
+              round
+              type="warning"
+              :loading="decryptRow[row.id]"
+              @click="decryptOne(row)"
+            >
+              解密
+            </van-button>
+            <van-button
+              v-else
+              size="mini"
+              plain
+              hairline
+              round
+              type="primary"
+              @click="copyOrderText(row)"
+            >
+              复制
+            </van-button>
+            <van-button
+              v-if="!isMaskedReceiver(row)"
+              size="mini"
+              plain
+              hairline
+              round
+              type="warning"
+              :loading="decryptRow[row.id]"
+              @click="decryptOne(row)"
+            >
+              重新解密
+            </van-button>
           </div>
           <div class="muted meta-line">
             {{ labelSourceChannel(row.sourceChannel) }}
@@ -243,6 +278,13 @@ import {
   type OmsSupplier,
 } from '../../api/oms'
 import { listItemMeta, listItemTitle, listOrderRootItems } from '../../utils/orderItemTree'
+import { copyToClipboard } from '../../utils/clipboard'
+import {
+  buildOrderCopyText,
+  canDecryptOrder,
+  formatAddress,
+  isMaskedReceiver,
+} from '../../utils/orderCopy'
 import { daysAgo, toApiDateTimeRange, todayDay } from '../../utils/dateRange'
 
 const router = useRouter()
@@ -273,6 +315,7 @@ const allocForm = reactive({
 })
 const batchSupplierId = ref(0)
 const batchSupplierName = ref('')
+const decryptRow = reactive<Record<number, boolean>>({})
 
 const statusFilter = computed(() => {
   const s = route.query.status
@@ -440,13 +483,49 @@ async function quickRevoke(row: OmsOrder) {
   }
 }
 
+function applyDecryptedOrders(items: OmsOrder[]) {
+  const byId = new Map(items.map((o) => [o.id, o]))
+  list.value = list.value.map((o) => byId.get(o.id) || o)
+}
+
+async function decryptOne(row: OmsOrder) {
+  if (!canDecryptOrder(row)) {
+    showFailToast('仅电商订单可解密')
+    return
+  }
+  decryptRow[row.id] = true
+  try {
+    const res = await omsApi.decryptOrders([row.id])
+    applyDecryptedOrders(res.items || [])
+    showSuccessToast('解密成功')
+  } catch (e: any) {
+    showFailToast(e.message || '解密失败')
+  } finally {
+    decryptRow[row.id] = false
+  }
+}
+
+async function copyOrderText(row: OmsOrder) {
+  const address = formatAddress(row.address)
+  if (!address || address === '-') {
+    showFailToast('暂无收件信息，请先解密')
+    return
+  }
+  const ok = await copyToClipboard(buildOrderCopyText(row))
+  if (ok) showSuccessToast('已复制')
+  else showFailToast('复制失败')
+}
+
 async function batchDecrypt() {
-  const ids = [...selectedIds.value]
-  if (!ids.length) return
+  const ids = list.value.filter((o) => selectedIds.value.has(o.id) && canDecryptOrder(o)).map((o) => o.id)
+  if (!ids.length) {
+    showFailToast('没有可解密的电商订单')
+    return
+  }
   try {
     const res = await omsApi.decryptOrders(ids)
-    showSuccessToast(`解密成功 ${res.success || 0} 单`)
-    reload()
+    applyDecryptedOrders(res.items || [])
+    showSuccessToast(`已解密 ${res.success || res.items?.length || 0} 条`)
   } catch (e: any) {
     showFailToast(e.message || '解密失败')
   }
@@ -680,6 +759,14 @@ watch(
 .receiver-line {
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.45;
+  word-break: break-all;
+}
+.addr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
 }
 .meta-line {
   margin-top: 4px;

@@ -1,5 +1,6 @@
 import * as pdfjs from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import { copyToClipboard } from './clipboard'
 
 let workerReady: Promise<void> | null = null
 
@@ -60,18 +61,8 @@ export function downloadDataUrl(dataUrl: string, filename: string) {
 }
 
 export async function copyText(text: string) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text)
-    return
-  }
-  const ta = document.createElement('textarea')
-  ta.value = text
-  ta.style.position = 'fixed'
-  ta.style.left = '-9999px'
-  document.body.appendChild(ta)
-  ta.select()
-  document.execCommand('copy')
-  ta.remove()
+  const ok = await copyToClipboard(text)
+  if (!ok) throw new Error('复制失败')
 }
 
 /** 尝试复制 PNG 到剪贴板；不支持时抛错由调用方回退 */
