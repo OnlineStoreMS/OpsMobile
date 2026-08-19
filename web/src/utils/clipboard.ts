@@ -1,4 +1,4 @@
-/** 复制文本到剪贴板（兼容移动端 Safari 异步场景与 HTTP 非安全上下文） */
+/** 复制文本到剪贴板（兼容移动端 Safari 与 HTTP 非安全上下文） */
 export async function copyToClipboard(text: string): Promise<boolean> {
   if (!text) return false
 
@@ -11,21 +11,38 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     }
   }
 
+  return execCopyFallback(text)
+}
+
+function execCopyFallback(text: string): boolean {
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.style.position = 'fixed'
+  textarea.style.top = '0'
+  textarea.style.left = '0'
+  textarea.style.width = '2em'
+  textarea.style.height = '2em'
+  textarea.style.padding = '0'
+  textarea.style.border = 'none'
+  textarea.style.outline = 'none'
+  textarea.style.boxShadow = 'none'
+  textarea.style.background = 'transparent'
+  textarea.style.fontSize = '16px'
+  textarea.style.opacity = '0'
+  textarea.setAttribute('aria-hidden', 'true')
+
+  document.body.appendChild(textarea)
+  textarea.focus({ preventScroll: true })
+
+  let ok = false
   try {
-    const textarea = document.createElement('textarea')
-    textarea.value = text
-    textarea.setAttribute('readonly', 'true')
-    textarea.style.position = 'fixed'
-    textarea.style.left = '-9999px'
-    textarea.style.top = '0'
-    document.body.appendChild(textarea)
-    textarea.focus()
     textarea.select()
     textarea.setSelectionRange(0, text.length)
-    const ok = document.execCommand('copy')
-    document.body.removeChild(textarea)
-    return ok
+    ok = document.execCommand('copy')
   } catch {
-    return false
+    ok = false
   }
+
+  document.body.removeChild(textarea)
+  return ok
 }

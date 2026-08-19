@@ -105,7 +105,7 @@ import {
   canDecryptOrder,
   isMaskedReceiver,
 } from '../../utils/supplyOrderCopy'
-import { copyToClipboard } from '../../utils/clipboard'
+import { copyTextForUser } from '../../utils/copyFallback'
 import { daysAgo, toApiDateTimeRange, todayDay } from '../../utils/dateRange'
 
 const router = useRouter()
@@ -246,11 +246,9 @@ async function copyRow(row: PurchaseOrderListItem) {
       showFailToast('暂无收件信息可复制')
       return
     }
-    const ok = await copyToClipboard(text)
+    const ok = await copyTextForUser(text)
     if (ok) {
       showSuccessToast(orders.length > 1 ? `已复制 ${orders.length} 笔（已标序号）` : '已复制')
-    } else {
-      showFailToast('复制失败')
     }
   } catch (e: any) {
     showFailToast(e.message || '复制失败')

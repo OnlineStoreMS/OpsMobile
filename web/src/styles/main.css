@@ -606,3 +606,36 @@ body {
   font-weight: 600;
   font-size: 14px;
 }
+
+.copy-sheet {
+  padding: 16px 16px calc(12px + var(--ops-safe-bottom));
+}
+.copy-sheet__title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.copy-sheet__hint {
+  font-size: 12px;
+  color: var(--ops-muted);
+  margin-bottom: 10px;
+  line-height: 1.45;
+}
+.copy-sheet__text {
+  width: 100%;
+  min-height: 160px;
+  max-height: 38vh;
+  border: 1px solid var(--ops-line);
+  border-radius: var(--ops-radius-sm);
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ops-text);
+  background: var(--ops-bg-elevated);
+  resize: none;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+.copy-sheet__btn + .copy-sheet__btn {
+  margin-top: 8px;
+}
