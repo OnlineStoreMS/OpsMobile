@@ -390,8 +390,10 @@ import {
   buildShipPickRows,
   buildShipPickSnapshot,
   goodsCargoName,
+  healShipPlanLines,
   readLastCarrierId,
   readLastShipperId,
+  rematchPlanParentId,
   rememberShipPrefs,
   rootOMSItems,
   saveSFOrderHandoff,
@@ -528,7 +530,7 @@ function toggleItem(key: string) {
 async function initShipPickSelection(o: OMSOrder) {
   try {
     const { list } = await shippingApi.getShipPlan(o.id, 'pending')
-    pendingShipPlanLines.value = list || []
+    pendingShipPlanLines.value = healShipPlanLines(o, list || [])
   } catch {
     pendingShipPlanLines.value = []
   }
@@ -613,9 +615,11 @@ async function openSplitEdit() {
   splitEditMode.value = 'partial'
   try {
     const { list } = await shippingApi.getShipPlan(order.value.id)
-    const pending = (list || []).filter((l) => l.status === 'pending')
+    const pending = healShipPlanLines(order.value, (list || []).filter((l) => l.status === 'pending'))
     const isFull = pending.length > 0 && pending.every((l) => !l.orderItemId)
     splitEditMode.value = isFull ? 'full' : 'partial'
+    const roots = rootOMSItems(order.value)
+    let needsPersistHeal = false
     for (const line of pending) {
       if (isFull || !line.orderItemId) {
         splitDraftSeq += 1
@@ -628,16 +632,35 @@ async function openSplitEdit() {
         })
         continue
       }
-      const itemIndex = rootOMSItems(order.value).findIndex((it) => it.id === line.orderItemId)
-      if (itemIndex < 0) continue
+      const rawId = Number(line.orderItemId || 0)
+      const parentId = rematchPlanParentId(order.value, rawId, line.splitOrderItemId)
+      const itemIndex = roots.findIndex((it) => it.id === parentId)
+      if (itemIndex < 0 || !parentId) continue
+      if (parentId !== rawId) needsPersistHeal = true
       splitDraftSeq += 1
       splitDraftLines.value.push({
         key: `d${splitDraftSeq}`,
         itemIndex,
-        orderItemId: line.orderItemId,
+        orderItemId: parentId,
         skuName: line.skuName,
         qty: Math.max(1, line.qty || 1),
       })
+    }
+    if (needsPersistHeal && splitDraftLines.value.length && splitEditMode.value === 'partial') {
+      try {
+        await shippingApi.putShipPlan(
+          order.value.id,
+          splitDraftLines.value.map((l, i) => ({
+            orderItemId: l.orderItemId,
+            skuName: l.skuName.trim(),
+            qty: l.qty,
+            sortNo: i + 1,
+          })),
+        )
+        await initShipPickSelection(order.value)
+      } catch {
+        /* 展示草稿优先 */
+      }
     }
   } catch (e) {
     showFailToast((e as Error).message || '加载拆分计划失败')

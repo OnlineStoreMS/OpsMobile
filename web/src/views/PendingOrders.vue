@@ -93,7 +93,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
 import { listPendingOmsOrders, shippingApi, type OMSOrder } from '../api/shipping'
 import { formatOrderSource, formatTime, labelShipStatus } from '../utils/labels'
-import { formatOrderGoodsSummary } from '../utils/sfOrderHandoff'
+import { formatOrderGoodsSummary, healShipPlanLines } from '../utils/sfOrderHandoff'
 
 const route = useRoute()
 const router = useRouter()
@@ -158,8 +158,8 @@ async function attachPendingPlanCounts(orders: OMSOrder[]) {
       needPlans.map(async (o) => {
         try {
           const { list: plans } = await shippingApi.getShipPlan(o.id)
-          o.shipPlanLines = plans || []
-          o.pendingPlanCount = (plans || []).filter((l) => l.status === 'pending').length
+          o.shipPlanLines = healShipPlanLines(o, plans || [])
+          o.pendingPlanCount = (o.shipPlanLines || []).filter((l) => l.status === 'pending').length
         } catch {
           o.shipPlanLines = []
         }

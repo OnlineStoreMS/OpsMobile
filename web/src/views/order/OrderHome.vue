@@ -51,7 +51,7 @@ const sections = [
       {
         path: '/order/orders',
         title: '全部订单',
-        desc: '单号 · 手机号搜索',
+        desc: '发货 · 类型 · 时间筛选',
         icon: 'orders-o',
         gradient: 'linear-gradient(145deg, #1e3a5f, #3b82f6)',
         glow: 'rgba(59, 130, 246, 0.28)',
@@ -59,7 +59,7 @@ const sections = [
       {
         path: '/order/orders?status=pending_alloc',
         title: '待分配',
-        desc: '待分配履约',
+        desc: '分配 · 批量代发',
         icon: 'todo-list-o',
         gradient: 'linear-gradient(145deg, #c2410c, #f59e0b)',
         glow: 'rgba(245, 158, 11, 0.28)',
@@ -67,7 +67,7 @@ const sections = [
       {
         path: '/order/orders?status=allocated',
         title: '已分配',
-        desc: '已分配跟催',
+        desc: '撤回 · 发货跟催',
         icon: 'passed',
         gradient: 'linear-gradient(145deg, #047857, #10b981)',
         glow: 'rgba(16, 185, 129, 0.26)',

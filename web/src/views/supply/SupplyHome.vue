@@ -11,7 +11,7 @@
             :key="app.path"
             class="grid-app"
             :style="{ '--tile-glow': app.glow }"
-            @click="router.push(app.path)"
+            @click="go(app.path)"
           >
             <div class="icon-wrap" :style="{ background: app.gradient }">
               <van-icon :name="app.icon" />
@@ -31,25 +31,46 @@ import HubHeader from '../../components/HubHeader.vue'
 
 const router = useRouter()
 
+function go(path: string) {
+  const q = path.indexOf('?')
+  if (q < 0) {
+    router.push(path)
+    return
+  }
+  const query: Record<string, string> = {}
+  new URLSearchParams(path.slice(q + 1)).forEach((v, k) => {
+    query[k] = v
+  })
+  router.push({ path: path.slice(0, q), query })
+}
+
 const sections = [
   {
     title: '采购',
     items: [
       {
-        path: '/supply/purchase-orders',
-        title: '采购订单',
-        desc: '列表 · 状态 · 金额',
-        icon: 'orders-o',
+        path: '/supply/purchase-orders?fulfillmentType=dropship',
+        title: '代发订单',
+        desc: '物流 · 拆分 · 解密复制',
+        icon: 'logistics',
         gradient: 'linear-gradient(145deg, #0f766e, #14b8a6)',
         glow: 'rgba(20, 184, 166, 0.28)',
+      },
+      {
+        path: '/supply/purchase-orders?fulfillmentType=stock_in',
+        title: '采购订单',
+        desc: '入仓采购 · 到货跟进',
+        icon: 'orders-o',
+        gradient: 'linear-gradient(145deg, #0369a1, #0ea5e9)',
+        glow: 'rgba(14, 165, 233, 0.28)',
       },
       {
         path: '/supply/suppliers',
         title: '供应商',
         desc: '档案速查',
         icon: 'shop-o',
-        gradient: 'linear-gradient(145deg, #0369a1, #0ea5e9)',
-        glow: 'rgba(14, 165, 233, 0.28)',
+        gradient: 'linear-gradient(145deg, #1d4e89, #3b82f6)',
+        glow: 'rgba(59, 130, 246, 0.24)',
       },
     ],
   },
@@ -69,8 +90,8 @@ const sections = [
         title: '收货记录',
         desc: '收包流水',
         icon: 'logistics',
-        gradient: 'linear-gradient(145deg, #1d4e89, #3b82f6)',
-        glow: 'rgba(59, 130, 246, 0.24)',
+        gradient: 'linear-gradient(145deg, #7c3aed, #a78bfa)',
+        glow: 'rgba(167, 139, 250, 0.28)',
       },
       {
         path: '/supply/inbounds',

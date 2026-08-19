@@ -25,6 +25,34 @@ export function rootOMSItems(order?: OMSOrder | null) {
   return (order?.items || []).filter((it) => !isOMSSplitChild(it))
 }
 
+/** 订单同步后根行 id 可能变化，拆分计划上的 orderItemId 会失效；尽量重绑到当前根行 */
+export function rematchPlanParentId(
+  order: OMSOrder,
+  orderItemId?: number,
+  splitOrderItemId?: number,
+): number {
+  const roots = rootOMSItems(order)
+  const want = Number(orderItemId || 0)
+  if (want > 0 && roots.some((r) => r.id === want)) return want
+  if (splitOrderItemId) {
+    const child = (order.items || []).find((it) => it.id === splitOrderItemId)
+    const parentId = Number(child?.parentOrderItemId || 0)
+    if (parentId > 0 && roots.some((r) => r.id === parentId)) return parentId
+  }
+  if (roots.length === 1 && roots[0].id) return roots[0].id
+  return 0
+}
+
+export function healShipPlanLines(order: OMSOrder, lines: ShipPlanLine[]): ShipPlanLine[] {
+  if (!lines?.length) return lines || []
+  return lines.map((l) => {
+    if (!l.orderItemId) return l
+    const next = rematchPlanParentId(order, l.orderItemId, l.splitOrderItemId)
+    if (!next || next === l.orderItemId) return l
+    return { ...l, orderItemId: next }
+  })
+}
+
 function isShippableOMSItem(
   order: OMSOrder,
   it: NonNullable<OMSOrder['items']>[number],
@@ -216,7 +244,7 @@ export function buildShipPickSnapshot(
 /** 列表/详情商品展示：有拆分计划时用规格行替换被拆原商品 */
 export function orderGoodsDisplayRows(order: OMSOrder) {
   const shippedMap = shippedQtyByItem(order)
-  const plans = order.shipPlanLines || []
+  const plans = healShipPlanLines(order, order.shipPlanLines || [])
   const pendingPlans = plans.filter((l) => l.status === 'pending')
   const shippedPlans = plans.filter((l) => l.status === 'shipped')
   const isFullOrderPlan =
@@ -326,7 +354,7 @@ export function formatOrderGoodsSummary(order: OMSOrder): string {
 
 export function buildShipPickRows(order: OMSOrder, planLines: ShipPlanLine[]) {
   const remaining = remainingQtyByItem(order)
-  const pending = planLines.filter((l) => l.status === 'pending')
+  const pending = healShipPlanLines(order, planLines).filter((l) => l.status === 'pending')
   type Row = {
     key: string
     kind: 'plan' | 'item'
