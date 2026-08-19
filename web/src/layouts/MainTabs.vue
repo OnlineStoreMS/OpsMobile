@@ -1,7 +1,5 @@
 <template>
   <div class="main-shell">
-    <TenantSwitcher v-if="showTenantSwitch && !isHub" class="global-tenant-switch" variant="bar" />
-
     <!-- N 个顶层大页：左右滑切换（配置见 hubPages.ts） -->
     <div v-show="isHub" class="hub-pager">
       <van-swipe
@@ -50,13 +48,12 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { SwipeInstance } from 'vant'
-import TenantSwitcher from '../components/TenantSwitcher.vue'
 import { useSession } from '../composables/useSession'
 import { hubIndexByPath, hubPages, isHubPath } from '../hubPages'
 
 const route = useRoute()
 const router = useRouter()
-const { session, showTenantSwitch, load } = useSession()
+const { session, load } = useSession()
 const swipeRef = ref<SwipeInstance>()
 const hubIndex = ref(hubIndexByPath(route.path))
 
@@ -252,13 +249,5 @@ onMounted(() => {
 /* 左右滑动画中短暂锁滚动，避免双层滚动；动画结束后恢复 */
 .deep-layer--locking {
   overflow: hidden;
-}
-
-.global-tenant-switch {
-  position: fixed;
-  top: calc(8px + env(safe-area-inset-top));
-  right: 12px;
-  z-index: 30;
-  max-width: calc(100vw - 24px);
 }
 </style>
