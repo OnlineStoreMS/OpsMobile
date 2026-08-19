@@ -334,7 +334,8 @@ import {
   type AppointOptionChild,
 } from '../utils/sfAppointTime'
 import {
-  consumeSFOrderHandoff,
+  clearSFOrderHandoff,
+  readSFOrderHandoff,
   goodsCargoName,
   parseChineseRegion,
   readLastCarrierId,
@@ -943,7 +944,7 @@ async function loadOptions() {
 
 onMounted(async () => {
   try {
-    const handoff = consumeSFOrderHandoff()
+    const handoff = readSFOrderHandoff()
     if (handoff?.order) applyHandoff(handoff)
     else showFailToast('无寄件数据，请从待发货进入')
     await loadOptions()
@@ -951,6 +952,7 @@ onMounted(async () => {
   } catch (e) {
     showFailToast((e as Error).message || '加载失败')
   } finally {
+    clearSFOrderHandoff()
     loading.value = false
   }
 })

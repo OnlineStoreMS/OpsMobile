@@ -39,7 +39,7 @@
           @after-enter="onSlideUnlock"
           @after-leave="onSlideUnlock"
         >
-          <component :is="Component" :key="`${tenantKey}-${r.fullPath}`" />
+          <component :is="Component" :key="r.fullPath" />
         </transition>
       </router-view>
     </div>

@@ -535,7 +535,7 @@ async function initShipPickSelection(o: OMSOrder) {
     pendingShipPlanLines.value = []
   }
   shipPickRows.value = buildShipPickRows(o, pendingShipPlanLines.value)
-  selectedKeys.value = []
+  selectedKeys.value = shipPickRows.value.map((r) => r.key)
 }
 
 function buildSnapshot() {

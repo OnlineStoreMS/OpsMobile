@@ -416,15 +416,25 @@ export function saveSFOrderHandoff(payload: SFOrderHandoff) {
   sessionStorage.setItem(SF_ORDER_HANDOFF_KEY, JSON.stringify(payload))
 }
 
-export function consumeSFOrderHandoff(): SFOrderHandoff | null {
+/** 读取 handoff，不立即清除（避免路由组件因 session 加载 remount 时二次进入读不到） */
+export function readSFOrderHandoff(): SFOrderHandoff | null {
   const raw = sessionStorage.getItem(SF_ORDER_HANDOFF_KEY)
   if (!raw) return null
-  sessionStorage.removeItem(SF_ORDER_HANDOFF_KEY)
   try {
     return JSON.parse(raw) as SFOrderHandoff
   } catch {
     return null
   }
+}
+
+export function clearSFOrderHandoff() {
+  sessionStorage.removeItem(SF_ORDER_HANDOFF_KEY)
+}
+
+export function consumeSFOrderHandoff(): SFOrderHandoff | null {
+  const handoff = readSFOrderHandoff()
+  if (handoff) clearSFOrderHandoff()
+  return handoff
 }
 
 export function rememberShipPrefs(carrierAccountId?: number, shipperProfileId?: number) {
