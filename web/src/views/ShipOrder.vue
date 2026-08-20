@@ -174,7 +174,7 @@
             <span class="pick-row__arrow">›</span>
           </button>
           <div class="muted tip">
-            任务下发到在线电脑；扩展自动在快递助手勾选本单。请先在首页「快递助手插件」绑定电脑。
+            任务下发到在线电脑；扩展自动在快递助手勾选本单。请先在电脑扩展生成配对码，再在「快递助手插件」页输入绑定。
             <button type="button" class="link-inline" @click="router.push('/kdzs-print')">去绑定</button>
           </div>
         </div>

@@ -10,15 +10,19 @@
       <div class="section-label">绑定打单电脑</div>
       <div class="card">
         <div class="muted tip">
-          1. 点下方生成配对码<br />
-          2. 在电脑 Chrome 扩展弹窗输入配对码并绑定<br />
-          3. 保持快递助手已登录、浏览器常开；状态显示「在线」后即可远程打单
+          1. 电脑 Chrome 扩展弹窗点「生成配对码」<br />
+          2. 在下方输入电脑显示的 6 位配对码并绑定<br />
+          3. 保持快递助手已登录、浏览器常开；设备显示「在线」后即可远程打单
         </div>
-        <div v-if="pairCode" class="pair-box">
-          <div class="pair-code">{{ pairCode }}</div>
-          <div class="muted">有效至 {{ pairExpireText }}</div>
-        </div>
-        <van-button block type="primary" :loading="pairing" @click="createPair">生成配对码</van-button>
+        <van-field
+          v-model="pairCodeInput"
+          type="digit"
+          maxlength="6"
+          label="配对码"
+          placeholder="输入电脑上的 6 位码"
+          clearable
+        />
+        <van-button block type="primary" :loading="pairing" @click="claimPair">绑定电脑</van-button>
       </div>
 
       <div class="section-label">已绑定设备</div>
@@ -56,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { shippingApi, type KdzsPrintDevice, type KdzsPrintTask } from '../api/shipping'
@@ -66,16 +70,8 @@ const loading = ref(false)
 const pairing = ref(false)
 const devices = ref<KdzsPrintDevice[]>([])
 const tasks = ref<KdzsPrintTask[]>([])
-const pairCode = ref('')
-const pairExpireAt = ref('')
+const pairCodeInput = ref('')
 let timer: number | undefined
-
-const pairExpireText = computed(() => {
-  if (!pairExpireAt.value) return ''
-  const d = new Date(pairExpireAt.value)
-  if (Number.isNaN(d.getTime())) return pairExpireAt.value
-  return d.toLocaleTimeString()
-})
 
 function formatTime(v?: string) {
   if (!v) return '-'
@@ -111,15 +107,20 @@ async function refresh() {
   }
 }
 
-async function createPair() {
+async function claimPair() {
+  const code = pairCodeInput.value.trim()
+  if (code.length < 4) {
+    showFailToast('请输入电脑上的配对码')
+    return
+  }
   pairing.value = true
   try {
-    const res = await shippingApi.createKdzsPrintPairSession()
-    pairCode.value = res.pairCode
-    pairExpireAt.value = res.expireAt
-    showSuccessToast('请在扩展中输入配对码')
+    const d = await shippingApi.claimKdzsPrintPair(code)
+    pairCodeInput.value = ''
+    showSuccessToast(`已绑定「${d.name}」`)
+    await refresh()
   } catch (e) {
-    showFailToast((e as Error).message || '生成失败')
+    showFailToast((e as Error).message || '绑定失败')
   } finally {
     pairing.value = false
   }
@@ -169,20 +170,6 @@ onUnmounted(() => {
 .tip {
   margin-bottom: 12px;
   line-height: 1.55;
-}
-.pair-box {
-  text-align: center;
-  margin-bottom: 12px;
-  padding: 12px;
-  background: #f0fdfa;
-  border-radius: 12px;
-}
-.pair-code {
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  color: #0f766e;
-  margin-bottom: 4px;
 }
 .empty {
   padding: 8px 0;

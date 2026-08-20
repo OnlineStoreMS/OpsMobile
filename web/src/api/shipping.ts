@@ -430,10 +430,8 @@ export const shippingApi = {
   listExpressTemplates: (params?: Record<string, unknown>) =>
     page<ExpressTemplate>('/express-templates', params),
 
-  createKdzsPrintPairSession: () =>
-    shippingClient.post('/kdzs-print/pair-sessions').then((r) =>
-      unwrap<{ pairCode: string; expireAt: string }>(r),
-    ),
+  claimKdzsPrintPair: (pairCode: string) =>
+    shippingClient.post('/kdzs-print/pair-claim', { pairCode }).then((r) => unwrap<KdzsPrintDevice>(r)),
   listKdzsPrintDevices: () =>
     shippingClient.get('/kdzs-print/devices').then((r) =>
       unwrap<{ list: KdzsPrintDevice[]; total: number }>(r),
