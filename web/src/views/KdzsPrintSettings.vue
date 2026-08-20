@@ -10,9 +10,10 @@
       <div class="section-label">绑定打单电脑</div>
       <div class="card">
         <div class="muted tip">
-          1. 电脑 Chrome 扩展弹窗点「生成配对码」<br />
+          1. 电脑 Chrome 加载扩展目录 kdzs-print-mobile（名称：快递助手·手机版）→ 点「生成配对码」<br />
           2. 在下方输入电脑显示的 6 位配对码并绑定<br />
-          3. 保持快递助手已登录、浏览器常开；设备显示「在线」后即可远程打单
+          3. 保持快递助手已登录、浏览器常开；设备显示「在线」后即可远程打单<br />
+          4. 发货中心电脑端请另装 kdzs-print-helper（电脑版），勿与手机版同时启用
         </div>
         <van-field
           v-model="pairCodeInput"
