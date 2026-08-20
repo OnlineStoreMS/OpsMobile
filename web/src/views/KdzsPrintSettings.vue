@@ -25,6 +25,24 @@
         <van-button block type="primary" :loading="pairing" @click="claimPair">绑定电脑</van-button>
       </div>
 
+      <div class="section-label">默认打印机</div>
+      <div class="card">
+        <div class="muted tip">
+          填写电脑打印弹窗里的完整打印机名称（须一字不差）。<br />
+          下发打单任务时会带给扩展，自动选中后再点「打印快递单」。
+        </div>
+        <van-field
+          v-model="printerName"
+          label="打印机"
+          placeholder="如 HPRT N31C"
+          clearable
+          maxlength="120"
+        />
+        <van-button block type="primary" plain :loading="savingPrinter" @click="savePrinter">
+          保存打印机
+        </van-button>
+      </div>
+
       <div class="section-label">已绑定设备</div>
       <div class="card">
         <van-loading v-if="loading" size="24px" vertical>加载中…</van-loading>
@@ -64,13 +82,16 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import { shippingApi, type KdzsPrintDevice, type KdzsPrintTask } from '../api/shipping'
+import { readKdzsPrinterName, writeKdzsPrinterName } from '../utils/kdzsPrinter'
 
 const router = useRouter()
 const loading = ref(false)
 const pairing = ref(false)
+const savingPrinter = ref(false)
 const devices = ref<KdzsPrintDevice[]>([])
 const tasks = ref<KdzsPrintTask[]>([])
 const pairCodeInput = ref('')
+const printerName = ref(readKdzsPrinterName())
 let timer: number | undefined
 
 function formatTime(v?: string) {
@@ -123,6 +144,22 @@ async function claimPair() {
     showFailToast((e as Error).message || '绑定失败')
   } finally {
     pairing.value = false
+  }
+}
+
+function savePrinter() {
+  const name = printerName.value.trim()
+  if (!name) {
+    showFailToast('请填写完整打印机名称')
+    return
+  }
+  savingPrinter.value = true
+  try {
+    writeKdzsPrinterName(name)
+    printerName.value = name
+    showSuccessToast('打印机已保存')
+  } finally {
+    savingPrinter.value = false
   }
 }
 

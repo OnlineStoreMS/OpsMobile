@@ -174,8 +174,10 @@
             <span class="pick-row__arrow">›</span>
           </button>
           <div class="muted tip">
-            任务下发到在线电脑；扩展自动在快递助手勾选本单。请先在电脑扩展生成配对码，再在「快递助手插件」页输入绑定。
-            <button type="button" class="link-inline" @click="router.push('/kdzs-print')">去绑定</button>
+            任务下发到在线电脑；扩展自动勾选、按配置打印机打印并发货。
+            <button type="button" class="link-inline" @click="router.push('/kdzs-print')">绑定/打印机</button>
+            <span v-if="kdzsPrinterName" class="muted"> · 打印机 {{ kdzsPrinterName }}</span>
+            <span v-else class="muted"> · 未配置打印机名</span>
           </div>
         </div>
       </template>
@@ -491,6 +493,7 @@ import {
 } from '../utils/sfOrderHandoff'
 import { printShipmentByChannel } from '../utils/sfPrintLabel'
 import { getSavedPrinterIndex, getSavedPrinterName } from '../utils/sfPrintPlugin'
+import { readKdzsPrinterName } from '../utils/kdzsPrinter'
 
 type ShipPickRow = ReturnType<typeof buildShipPickRows>[number]
 type SplitDraftLine = {
@@ -537,6 +540,7 @@ const kdzsTemplates = ref<ExpressTemplate[]>([])
 const kdzsDeviceId = ref<number | undefined>()
 const kdzsTemplateKey = ref('')
 const kdzsTemplateKeyword = ref('')
+const kdzsPrinterName = ref(readKdzsPrinterName())
 
 const savedCompany = findExpressCompany(localStorage.getItem(EXPRESS_COMPANY_CODE_KEY) || '')
   || findExpressCompany(localStorage.getItem(EXPRESS_COMPANY_KEY) || '')
@@ -926,6 +930,10 @@ watch(expressCompanyCode, () => {
   if (expressNo.value.trim()) refreshExpressNoCheck()
 })
 
+watch(shipMode, (mode) => {
+  if (mode === 'kdzs') kdzsPrinterName.value = readKdzsPrinterName()
+})
+
 function pickCarrier(id: number) {
   carrierAccountId.value = id
   rememberShipPrefs(id, shipperProfileId.value)
@@ -1134,6 +1142,13 @@ async function goKdzsPrint() {
     showFailToast('请选择快递模板')
     return
   }
+  const printer = readKdzsPrinterName()
+  kdzsPrinterName.value = printer
+  if (!printer) {
+    showFailToast('请先在「快递助手插件」页填写完整打印机名称')
+    await router.push('/kdzs-print')
+    return
+  }
   const timeRange = buildKdzsOrderTimeRange(order.value)
   const payload: Record<string, unknown> = {
     v: 1,
@@ -1141,6 +1156,7 @@ async function goKdzsPrint() {
     platform: orderPlatformCode(order.value),
     templateName: tpl.templateName || '',
     templateId: tpl.templateId,
+    printerName: printer,
     orders: [
       {
         orderNo: order.value.orderNo || '',
@@ -1163,7 +1179,7 @@ async function goKdzsPrint() {
     ],
     orderTimeFrom: timeRange?.from,
     orderTimeTo: timeRange?.to,
-    autoPrint: false,
+    autoPrint: true,
   }
   submitting.value = true
   try {
@@ -1204,6 +1220,7 @@ async function submit() {
 }
 
 onMounted(async () => {
+  kdzsPrinterName.value = readKdzsPrinterName()
   const id = Number(route.params.orderId)
   showLoadingToast({ message: '加载中…', forbidClick: true, duration: 0 })
   try {
