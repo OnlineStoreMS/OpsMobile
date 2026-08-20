@@ -67,10 +67,39 @@
               <div class="muted" v-if="row.item.refOrderNo && !row.isSplitChild">销售单 {{ row.item.refOrderNo }}</div>
               <div class="goods-qty">
                 ×{{ row.item.qty }}
-                <template v-if="!row.isSplitChild">
-                  · 采购 ¥{{ Number(row.item.unitPrice || 0).toFixed(2) }}
-                  <template v-if="row.item.saleAmount"> · 实付 ¥{{ Number(row.item.saleAmount).toFixed(2) }}</template>
+                <template v-if="!row.isSplitChild && row.item.saleAmount">
+                  · 实付 ¥{{ Number(row.item.saleAmount).toFixed(2) }}
                 </template>
+              </div>
+              <div v-if="!row.isSplitChild" class="price-edit" @click.stop>
+                <template v-if="canEditItemPrice(row)">
+                  <div class="price-edit__row">
+                    <span class="price-edit__label">采购单价</span>
+                    <van-field
+                      v-model="priceDraft[row.item.id!].unitPrice"
+                      type="number"
+                      input-align="right"
+                      placeholder="0.00"
+                      :disabled="savingPrice"
+                      @blur="onUnitPriceBlur(row.item)"
+                    />
+                  </div>
+                  <div class="price-edit__row">
+                    <span class="price-edit__label">采购小计</span>
+                    <van-field
+                      v-model="priceDraft[row.item.id!].lineAmount"
+                      type="number"
+                      input-align="right"
+                      placeholder="0.00"
+                      :disabled="savingPrice"
+                      @blur="onLineAmountBlur(row.item)"
+                    />
+                  </div>
+                </template>
+                <div v-else class="muted price-edit__readonly">
+                  采购 ¥{{ Number(row.item.unitPrice || 0).toFixed(2) }}
+                  · 小计 ¥{{ Number(row.item.lineAmount ?? (row.item.unitPrice || 0) * (row.item.qty || 0)).toFixed(2) }}
+                </div>
               </div>
               <div class="item-actions" v-if="isDropship && !row.item.cancelled">
                 <van-button
@@ -283,6 +312,105 @@ const canCancel = computed(() => {
 const canDelete = computed(() => detail.value?.status === 'draft')
 const showFooter = computed(() => canSubmit.value || canComplete.value || canCancel.value || canDelete.value)
 
+/** 完成/取消前可改采购价（与电脑端一致；与付款状态无关） */
+const canEditPurchasePrice = computed(() => {
+  const s = detail.value?.status
+  return !!s && s !== 'completed' && s !== 'cancelled'
+})
+
+const savingPrice = ref(false)
+/** 行内编辑草稿：字符串便于输入过程中保留小数点 */
+const priceDraft = reactive<Record<number, { unitPrice: string; lineAmount: string }>>({})
+
+function roundMoney(n: number) {
+  return Math.round((n + Number.EPSILON) * 100) / 100
+}
+
+function syncPriceDraftFromDetail() {
+  const items = detail.value?.items || []
+  for (const it of items) {
+    if (!it.id || it.splitKind || (it.parentPoItemId && it.parentPoItemId > 0)) continue
+    const line = Number(it.lineAmount ?? (it.unitPrice || 0) * (it.qty || 0))
+    priceDraft[it.id] = {
+      unitPrice: Number(it.unitPrice || 0).toFixed(2),
+      lineAmount: roundMoney(line).toFixed(2),
+    }
+  }
+}
+
+function canEditItemPrice(row: PoItemTreeRow) {
+  if (!canEditPurchasePrice.value || row.isSplitChild || row.item.cancelled || !row.item.id) return false
+  if (!priceDraft[row.item.id]) {
+    const line = Number(row.item.lineAmount ?? (row.item.unitPrice || 0) * (row.item.qty || 0))
+    priceDraft[row.item.id] = {
+      unitPrice: Number(row.item.unitPrice || 0).toFixed(2),
+      lineAmount: roundMoney(line).toFixed(2),
+    }
+  }
+  return true
+}
+
+async function saveItemUnitPrice(item: PurchaseOrderItem, unitPrice: number) {
+  if (!detail.value || !item.id || item.cancelled || !canEditPurchasePrice.value) return
+  if (item.splitKind || (item.parentPoItemId && item.parentPoItemId > 0)) {
+    showFailToast('拆分子行不参与采购计价')
+    return
+  }
+  if (Number.isNaN(unitPrice) || unitPrice < 0) {
+    showFailToast('采购金额不能为负数')
+    syncPriceDraftFromDetail()
+    return
+  }
+  const price = roundMoney(unitPrice)
+  if (price === roundMoney(Number(item.unitPrice || 0))) {
+    // 仅规范小数显示
+    syncPriceDraftFromDetail()
+    return
+  }
+
+  savingPrice.value = true
+  try {
+    detail.value = await supplyApi.updateItemPrices(detail.value.id, [
+      { itemId: item.id, unitPrice: price },
+    ])
+    syncPriceDraftFromDetail()
+    showSuccessToast('采购价已保存')
+  } catch (e: any) {
+    showFailToast(e.message || '保存采购价失败')
+    await loadAll()
+  } finally {
+    savingPrice.value = false
+  }
+}
+
+/** 改单价 → 按数量重算小计 */
+async function onUnitPriceBlur(item: PurchaseOrderItem) {
+  if (!item.id) return
+  const draft = priceDraft[item.id]
+  if (!draft) return
+  await saveItemUnitPrice(item, Number(draft.unitPrice))
+}
+
+/** 改小计 → 反推单价（单价 = 小计 / 数量） */
+async function onLineAmountBlur(item: PurchaseOrderItem) {
+  if (!item.id) return
+  const draft = priceDraft[item.id]
+  if (!draft) return
+  const amount = Number(draft.lineAmount)
+  const qty = Number(item.qty) || 0
+  if (qty <= 0) {
+    showFailToast('数量无效，无法反算单价')
+    syncPriceDraftFromDetail()
+    return
+  }
+  const currentLine = roundMoney(Number(item.lineAmount ?? (item.unitPrice || 0) * qty))
+  if (roundMoney(amount) === currentLine) {
+    syncPriceDraftFromDetail()
+    return
+  }
+  await saveItemUnitPrice(item, amount / qty)
+}
+
 const shipTargetTitle = computed(() => {
   const it = shipTarget.value
   if (!it) return ''
@@ -314,6 +442,7 @@ async function loadAll() {
   const id = Number(route.params.id)
   if (!id) return
   detail.value = await supplyApi.getPurchaseOrder(id)
+  syncPriceDraftFromDetail()
   try {
     shipments.value = await supplyApi.listShipments(id)
   } catch {
@@ -674,6 +803,37 @@ onMounted(async () => {
   margin-top: 4px;
   font-size: 12px;
   color: var(--ops-muted);
+}
+.price-edit {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.price-edit__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 0 4px 0 10px;
+}
+.price-edit__label {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--ops-muted);
+  width: 3.6em;
+}
+.price-edit__row :deep(.van-field) {
+  padding: 6px 8px;
+  background: transparent;
+}
+.price-edit__row :deep(.van-field__control) {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.price-edit__readonly {
+  font-size: 12px;
 }
 .item-actions {
   display: flex;

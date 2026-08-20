@@ -268,7 +268,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog, showFailToast, showSuccessToast } from 'vant'
 import DateRangeBar from '../../components/DateRangeBar.vue'
@@ -718,6 +718,11 @@ function reload() {
   void loadFilterCounts()
   void loadMore()
 }
+
+onMounted(() => {
+  // van-list 首屏只触发 loadMore；筛选数字需单独拉，否则要点筛选才出现
+  void loadFilterCounts()
+})
 
 watch(
   () => route.query.status,
