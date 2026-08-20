@@ -129,9 +129,17 @@
     </div>
     <van-loading v-else class="page-loading" vertical>加载中…</van-loading>
 
-    <!-- 拆分 -->
-    <van-popup v-model:show="splitVisible" position="bottom" round :style="{ maxHeight: '80%' }">
-      <div class="sheet-body">
+    <!-- 拆分（须 teleport 到 body，否则被子页 slide transform 裁成空白） -->
+    <van-popup
+      v-model:show="splitVisible"
+      position="bottom"
+      round
+      teleport="body"
+      class="sheet-popup"
+      safe-area-inset-bottom
+      :style="{ maxHeight: '80%' }"
+    >
+      <div class="sheet">
         <div class="sheet-title">{{ splitEditMode ? '编辑拆分' : '拆分规格' }}</div>
         <div class="muted" style="margin-bottom: 8px">留空保存即取消拆分</div>
         <div v-for="(line, idx) in splitLines" :key="idx" class="split-line">
@@ -147,19 +155,41 @@
     </van-popup>
 
     <!-- 发货并回传 -->
-    <van-popup v-model:show="shipVisible" position="bottom" round :style="{ maxHeight: '80%' }">
-      <div class="sheet-body">
+    <van-popup
+      v-model:show="shipVisible"
+      position="bottom"
+      round
+      teleport="body"
+      class="sheet-popup"
+      safe-area-inset-bottom
+      :style="{ maxHeight: '80%' }"
+    >
+      <div class="sheet">
         <div class="sheet-title">发货并回传</div>
-        <div class="muted" v-if="shipTarget">{{ shipTargetTitle }}</div>
-        <van-field v-model="shipForm.expressCompany" is-link readonly label="快递公司" placeholder="选择" @click="showExpressPicker = true" />
-        <van-field v-model="shipForm.expressNo" label="运单号" placeholder="物流单号" />
+        <div class="muted ship-target" v-if="shipTargetTitle">{{ shipTargetTitle }}</div>
+        <van-field
+          v-model="shipForm.expressCompany"
+          is-link
+          readonly
+          label="快递公司"
+          placeholder="选择"
+          @click="showExpressPicker = true"
+        />
+        <van-field v-model="shipForm.expressNo" label="运单号" placeholder="物流单号" clearable />
         <van-button block type="primary" round :loading="shipSaving" style="margin-top: 12px" @click="submitShip">
           发货并回传
         </van-button>
       </div>
     </van-popup>
 
-    <van-popup v-model:show="showExpressPicker" position="bottom" round>
+    <van-popup
+      v-model:show="showExpressPicker"
+      position="bottom"
+      round
+      teleport="body"
+      class="sheet-popup"
+      safe-area-inset-bottom
+    >
       <van-picker
         :columns="expressColumns"
         @confirm="onExpressConfirm"
@@ -669,13 +699,10 @@ onMounted(async () => {
 .page-loading {
   padding-top: 48px;
 }
-.sheet-body {
-  padding: 16px 16px 28px;
-}
-.sheet-title {
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 8px;
+.ship-target {
+  margin-bottom: 10px;
+  font-size: 13px;
+  word-break: break-word;
 }
 .split-line {
   border: 1px solid var(--ops-line);
