@@ -89,7 +89,7 @@
                   size="mini"
                   type="primary"
                   round
-                  @click="openShip(row)"
+                  @click.stop="openShip(row)"
                 >
                   发货并回传
                 </van-button>
@@ -129,19 +129,10 @@
     </div>
     <van-loading v-else class="page-loading" vertical>加载中…</van-loading>
 
-    <!-- 拆分（须 teleport 到 body，否则被子页 slide transform 裁成空白） -->
-    <van-popup
-      v-model:show="splitVisible"
-      position="bottom"
-      round
-      teleport="body"
-      class="sheet-popup"
-      safe-area-inset-bottom
-      :style="{ maxHeight: '80%' }"
-    >
-      <div class="sheet">
-        <div class="sheet-title">{{ splitEditMode ? '编辑拆分' : '拆分规格' }}</div>
-        <div class="muted" style="margin-bottom: 8px">留空保存即取消拆分</div>
+    <!-- 拆分 -->
+    <van-action-sheet v-model:show="splitVisible" title="拆分规格" :closeable="true" teleport="body">
+      <div class="sheet-body">
+        <div class="muted" style="margin-bottom: 8px">{{ splitEditMode ? '编辑拆分；留空保存即取消拆分' : '留空保存即取消拆分' }}</div>
         <div v-for="(line, idx) in splitLines" :key="idx" class="split-line">
           <van-field v-model="line.skuName" label="规格" placeholder="规格名称（默认留空）" />
           <van-field v-model.number="line.qty" type="digit" label="数量" />
@@ -152,50 +143,43 @@
         </van-button>
         <van-button block type="primary" round :loading="splitSaving" @click="saveSplit">保存</van-button>
       </div>
-    </van-popup>
+    </van-action-sheet>
 
-    <!-- 发货并回传 -->
-    <van-popup
-      v-model:show="shipVisible"
-      position="bottom"
-      round
-      teleport="body"
-      class="sheet-popup"
-      safe-area-inset-bottom
-      :style="{ maxHeight: '80%' }"
-    >
-      <div class="sheet">
-        <div class="sheet-title">发货并回传</div>
+    <!-- 发货并回传：不用 van-picker（未全局注册会空白），快递列表内嵌 -->
+    <van-action-sheet v-model:show="shipVisible" title="发货并回传" :closeable="true" teleport="body">
+      <div class="sheet-body">
         <div class="muted ship-target" v-if="shipTargetTitle">{{ shipTargetTitle }}</div>
         <van-field
           v-model="shipForm.expressCompany"
           is-link
           readonly
           label="快递公司"
-          placeholder="选择"
-          @click="showExpressPicker = true"
+          placeholder="选择快递公司"
+          @click="toggleExpressList"
         />
+        <div v-if="showExpressList" class="express-panel">
+          <van-search v-model="expressKeyword" shape="round" placeholder="搜索名称或编码" />
+          <div class="express-list">
+            <button
+              v-for="c in filteredExpressCompanies"
+              :key="c.code"
+              type="button"
+              class="express-item"
+              :class="{ 'express-item--on': shipForm.expressCompany === c.name }"
+              @click="pickExpress(c)"
+            >
+              <span>{{ c.name }}</span>
+              <span class="muted">{{ c.code }}</span>
+            </button>
+            <div v-if="!filteredExpressCompanies.length" class="muted" style="padding: 12px">无匹配快递</div>
+          </div>
+        </div>
         <van-field v-model="shipForm.expressNo" label="运单号" placeholder="物流单号" clearable />
         <van-button block type="primary" round :loading="shipSaving" style="margin-top: 12px" @click="submitShip">
           发货并回传
         </van-button>
       </div>
-    </van-popup>
-
-    <van-popup
-      v-model:show="showExpressPicker"
-      position="bottom"
-      round
-      teleport="body"
-      class="sheet-popup"
-      safe-area-inset-bottom
-    >
-      <van-picker
-        :columns="expressColumns"
-        @confirm="onExpressConfirm"
-        @cancel="showExpressPicker = false"
-      />
-    </van-popup>
+    </van-action-sheet>
   </div>
 </template>
 
@@ -213,7 +197,7 @@ import {
   type PurchaseOrder,
   type PurchaseOrderItem,
 } from '../../api/supply'
-import { EXPRESS_COMPANIES } from '../../constants/expressCompanies'
+import { EXPRESS_COMPANIES, type ExpressCompany } from '../../constants/expressCompanies'
 import {
   buildPoItemTree,
   isShippablePoItem,
@@ -247,9 +231,17 @@ const splitLines = ref<{ skuName: string; qty: number; shipPlanLineId?: number }
 const shipVisible = ref(false)
 const shipSaving = ref(false)
 const shipTarget = ref<PurchaseOrderItem | null>(null)
-const shipForm = reactive({ expressCompany: '', expressNo: '' })
-const showExpressPicker = ref(false)
-const expressColumns = EXPRESS_COMPANIES.map((c) => ({ text: c.name, value: c.name }))
+const shipForm = reactive({ expressCompany: '', expressNo: '', expressCode: '' })
+const showExpressList = ref(false)
+const expressKeyword = ref('')
+
+const filteredExpressCompanies = computed(() => {
+  const kw = expressKeyword.value.trim().toLowerCase()
+  if (!kw) return EXPRESS_COMPANIES.slice(0, 40)
+  return EXPRESS_COMPANIES.filter(
+    (c) => c.name.toLowerCase().includes(kw) || c.code.toLowerCase().includes(kw),
+  ).slice(0, 60)
+})
 
 const isDropship = computed(() => detail.value?.fulfillmentType === 'dropship')
 const navTitle = computed(() => (isDropship.value ? '代发单详情' : '采购单详情'))
@@ -469,12 +461,21 @@ function openShip(row: PoItemTreeRow) {
   shipTarget.value = row.item
   shipForm.expressCompany = ''
   shipForm.expressNo = ''
+  shipForm.expressCode = ''
+  expressKeyword.value = ''
+  showExpressList.value = false
   shipVisible.value = true
 }
 
-function onExpressConfirm({ selectedOptions }: { selectedOptions: Array<{ text: string }> }) {
-  shipForm.expressCompany = selectedOptions[0]?.text || ''
-  showExpressPicker.value = false
+function toggleExpressList() {
+  showExpressList.value = !showExpressList.value
+  if (showExpressList.value) expressKeyword.value = ''
+}
+
+function pickExpress(c: ExpressCompany) {
+  shipForm.expressCompany = c.name
+  shipForm.expressCode = c.code
+  showExpressList.value = false
 }
 
 async function submitShip() {
@@ -704,10 +705,47 @@ onMounted(async () => {
   font-size: 13px;
   word-break: break-word;
 }
+.sheet-body {
+  padding: 8px 16px calc(16px + var(--ops-safe-bottom));
+}
 .split-line {
   border: 1px solid var(--ops-line);
   border-radius: 12px;
   padding: 4px 8px 8px;
   margin-bottom: 8px;
+}
+.express-panel {
+  margin: 0 0 8px;
+  border: 1px solid var(--ops-line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+.express-list {
+  max-height: 220px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.express-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--ops-line);
+  background: transparent;
+  font-size: 14px;
+  color: var(--ops-text);
+}
+.express-item:last-child {
+  border-bottom: none;
+}
+.express-item--on {
+  color: var(--ops-primary);
+  font-weight: 650;
+  background: var(--ops-primary-soft);
 }
 </style>
