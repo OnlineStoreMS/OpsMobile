@@ -103,9 +103,10 @@
 
       <div class="section-label">发货方式</div>
       <div class="card">
-        <van-radio-group v-model="shipMode" direction="horizontal" class="mode-radios">
+        <van-radio-group v-model="shipMode" direction="horizontal" class="mode-radios mode-radios--wrap">
           <van-radio name="manual">手动填单号</van-radio>
           <van-radio name="print">自建物流打单</van-radio>
+          <van-radio name="kdzs">快递助手打单</van-radio>
         </van-radio-group>
       </div>
 
@@ -135,6 +136,47 @@
           />
           <div v-if="expressNoHint && !expressNoError" class="muted tip tip--ok">{{ expressNoHint }}</div>
           <div class="muted tip">勾选商品后选择物流公司并填写单号，点发货即可回写订单中心（支持部分发货）。</div>
+        </div>
+      </template>
+
+      <template v-else-if="shipMode === 'kdzs'">
+        <div class="section-label">快递助手</div>
+        <div class="card pick-card">
+          <button type="button" class="pick-row" @click="showKdzsDevice = true">
+            <div class="pick-row__badge ship">机</div>
+            <div class="pick-row__body">
+              <div class="pick-row__label">打单电脑</div>
+              <div v-if="kdzsDeviceView" class="pick-row__title">
+                {{ kdzsDeviceView.name }}
+                <span class="mini-tag" :class="kdzsDeviceView.online ? '' : 'mini-tag--off'">
+                  {{ kdzsDeviceView.online ? '在线' : '离线' }}
+                </span>
+              </div>
+              <div v-else class="muted">点击选择已绑定电脑</div>
+              <div v-if="kdzsDeviceView" class="muted pick-row__sub">{{ kdzsDeviceView.deviceKey }}</div>
+            </div>
+            <span class="pick-row__arrow">›</span>
+          </button>
+          <button type="button" class="pick-row" @click="showKdzsTemplate = true">
+            <div class="pick-row__badge carrier">模</div>
+            <div class="pick-row__body">
+              <div class="pick-row__label">快递模板</div>
+              <div v-if="kdzsTemplateView" class="pick-row__title">{{ kdzsTemplateView.templateName }}</div>
+              <div v-else class="muted">点击选择模板</div>
+              <div v-if="kdzsTemplateView" class="muted pick-row__sub">
+                {{
+                  [kdzsTemplateView.carrierName, kdzsTemplateView.platform, kdzsTemplateView.shopName]
+                    .filter(Boolean)
+                    .join(' · ')
+                }}
+              </div>
+            </div>
+            <span class="pick-row__arrow">›</span>
+          </button>
+          <div class="muted tip">
+            任务下发到在线电脑；扩展自动在快递助手勾选本单。请先在首页「快递助手插件」绑定电脑。
+            <button type="button" class="link-inline" @click="router.push('/kdzs-print')">去绑定</button>
+          </div>
         </div>
       </template>
 
@@ -278,6 +320,53 @@
       </div>
     </van-popup>
 
+    <van-popup v-model:show="showKdzsDevice" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
+      <div class="sheet">
+        <div class="sheet-title">选择打单电脑</div>
+        <button
+          v-for="d in kdzsDevices"
+          :key="d.id"
+          type="button"
+          class="option-card"
+          :class="{ active: kdzsDeviceId === d.id }"
+          @click="pickKdzsDevice(d.id)"
+        >
+          <div class="option-card__title">
+            {{ d.name }}
+            <span class="mini-tag" :class="d.online ? '' : 'mini-tag--off'">{{ d.online ? '在线' : '离线' }}</span>
+          </div>
+          <div class="muted">{{ d.deviceKey }}</div>
+        </button>
+        <div v-if="!kdzsDevices.length" class="muted pad">
+          暂无绑定设备，请先
+          <button type="button" class="link-inline" @click="router.push('/kdzs-print')">去绑定</button>
+        </div>
+      </div>
+    </van-popup>
+
+    <van-popup v-model:show="showKdzsTemplate" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
+      <div class="sheet sheet--company">
+        <div class="sheet-title">选择快递模板</div>
+        <van-search v-model="kdzsTemplateKeyword" placeholder="搜索模板名 / 快递 / 店铺" shape="round" />
+        <div class="company-list">
+          <button
+            v-for="t in filteredKdzsTemplates"
+            :key="t.id || t.templateId"
+            type="button"
+            class="option-card"
+            :class="{ active: kdzsTemplateKey === templateKey(t) }"
+            @click="pickKdzsTemplate(t)"
+          >
+            <div class="option-card__title">{{ t.templateName || t.templateId }}</div>
+            <div class="muted">
+              {{ [t.carrierName, t.platform, t.shopName].filter(Boolean).join(' · ') || t.templateId }}
+            </div>
+          </button>
+          <div v-if="!filteredKdzsTemplates.length" class="muted pad">无匹配模板（可在发货中心同步快递助手模板）</div>
+        </div>
+      </div>
+    </van-popup>
+
     <van-popup
       v-model:show="showSplit"
       position="bottom"
@@ -375,6 +464,8 @@ import {
   listPendingOmsOrders,
   shippingApi,
   type CarrierAccount,
+  type ExpressTemplate,
+  type KdzsPrintDevice,
   type OMSOrder,
   type ShipperProfile,
   type ShipPlanLine,
@@ -422,11 +513,13 @@ const carriers = ref<CarrierAccount[]>([])
 const shippers = ref<ShipperProfile[]>([])
 const carrierAccountId = ref<number | undefined>()
 const shipperProfileId = ref<number | undefined>()
-const shipMode = ref<'manual' | 'print'>('manual')
+const shipMode = ref<'manual' | 'print' | 'kdzs'>('manual')
 const sfAction = ref<'standard' | 'quick'>('standard')
 const showCarrier = ref(false)
 const showShipper = ref(false)
 const showCompany = ref(false)
+const showKdzsDevice = ref(false)
+const showKdzsTemplate = ref(false)
 const showSplit = ref(false)
 const splitSaving = ref(false)
 const splitEditMode = ref<'partial' | 'full'>('partial')
@@ -436,6 +529,14 @@ let splitDraftSeq = 0
 const EXPRESS_TYPE_KEY = 'shippingcore.sf.expressType'
 const EXPRESS_COMPANY_KEY = 'opsmobile.ship.expressCompany'
 const EXPRESS_COMPANY_CODE_KEY = 'opsmobile.ship.expressCompanyCode'
+const KDZS_DEVICE_KEY = 'opsmobile.kdzs.deviceId'
+const KDZS_TEMPLATE_KEY = 'opsmobile.kdzs.templateKey'
+
+const kdzsDevices = ref<KdzsPrintDevice[]>([])
+const kdzsTemplates = ref<ExpressTemplate[]>([])
+const kdzsDeviceId = ref<number | undefined>()
+const kdzsTemplateKey = ref('')
+const kdzsTemplateKeyword = ref('')
 
 const savedCompany = findExpressCompany(localStorage.getItem(EXPRESS_COMPANY_CODE_KEY) || '')
   || findExpressCompany(localStorage.getItem(EXPRESS_COMPANY_KEY) || '')
@@ -483,6 +584,24 @@ const carrierView = computed(
 const shipperView = computed(
   () => shippers.value.find((x) => x.id === shipperProfileId.value) || null,
 )
+const kdzsDeviceView = computed(
+  () => kdzsDevices.value.find((x) => x.id === kdzsDeviceId.value) || null,
+)
+const kdzsTemplateView = computed(
+  () => kdzsTemplates.value.find((t) => templateKey(t) === kdzsTemplateKey.value) || null,
+)
+const filteredKdzsTemplates = computed(() => {
+  const kw = kdzsTemplateKeyword.value.trim().toLowerCase()
+  const list = kdzsTemplates.value
+  if (!kw) return list
+  return list.filter((t) =>
+    [t.templateName, t.templateId, t.carrierName, t.platform, t.shopName]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(kw),
+  )
+})
 
 const canSubmit = computed(() => {
   if (!order.value || selectedKeys.value.length === 0) return false
@@ -493,14 +612,52 @@ const canSubmit = computed(() => {
       !expressNoError.value
     )
   }
+  if (shipMode.value === 'kdzs') {
+    return !!kdzsDeviceId.value && !!kdzsTemplateView.value
+  }
   return !!carrierAccountId.value && !!shipperProfileId.value
 })
 
 const primaryLabel = computed(() => {
   if (shipMode.value === 'manual') return '确认发货'
+  if (shipMode.value === 'kdzs') return '发送到电脑打单'
   if (sfAction.value === 'standard') return '前往标准寄件'
   return '快速下单打印'
 })
+
+function templateKey(t: ExpressTemplate) {
+  return String(t.templateId || t.id || t.templateName || '')
+}
+
+function orderPlatformCode(o?: OMSOrder | null): string {
+  const code = (o?.platform || '').trim().toUpperCase()
+  if (code === 'DY') return 'FXG'
+  if (code === 'HAND' || code === 'MANUAL') return 'DFHAND'
+  return code || 'FXG'
+}
+
+function buildKdzsOrderTimeRange(o: OMSOrder): { from: string; to: string } | null {
+  const raw = o.payTime || o.orderedAt
+  if (!raw) return null
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return null
+  const p = (n: number) => String(n).padStart(2, '0')
+  const ymd = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+  return { from: `${ymd} 00:00:00`, to: `${ymd} 23:59:59` }
+}
+
+function pickKdzsDevice(id: number) {
+  kdzsDeviceId.value = id
+  localStorage.setItem(KDZS_DEVICE_KEY, String(id))
+  showKdzsDevice.value = false
+}
+
+function pickKdzsTemplate(t: ExpressTemplate) {
+  const key = templateKey(t)
+  kdzsTemplateKey.value = key
+  localStorage.setItem(KDZS_TEMPLATE_KEY, key)
+  showKdzsTemplate.value = false
+}
 
 const isPartialSelection = computed(
   () =>
@@ -806,14 +963,20 @@ async function loadOrder(id: number) {
 }
 
 async function loadOptions() {
-  const [cRes, sRes] = await Promise.all([
+  const [cRes, sRes, dRes, tRes] = await Promise.all([
     shippingApi.listCarrierAccounts({ page: 1, pageSize: 100, enabled: true }),
     shippingApi.listShipperProfiles({ page: 1, pageSize: 100, enabled: true }),
+    shippingApi.listKdzsPrintDevices().catch(() => ({ list: [] as KdzsPrintDevice[], total: 0 })),
+    shippingApi
+      .listExpressTemplates({ page: 1, pageSize: 200 })
+      .catch(() => ({ list: [] as ExpressTemplate[], total: 0, page: 1, pageSize: 200 })),
   ])
   const all = (cRes.list || []).filter((c) => c.enabled !== false)
   const sf = all.filter((c) => /sf|顺丰/i.test(`${c.carrierCode || ''}${c.name || ''}`))
   carriers.value = sf.length ? sf : all
   shippers.value = (sRes.list || []).filter((s) => s.enabled !== false)
+  kdzsDevices.value = dRes.list || []
+  kdzsTemplates.value = (tRes.list || []).filter((t) => t.enabled !== false)
 
   const lastC = readLastCarrierId()
   const lastS = readLastShipperId()
@@ -823,6 +986,20 @@ async function loadOptions() {
     shippers.value.find((s) => s.id === lastS)?.id ||
     shippers.value.find((s) => s.isDefault)?.id ||
     shippers.value[0]?.id
+
+  const savedDev = Number(localStorage.getItem(KDZS_DEVICE_KEY) || 0)
+  if (savedDev && kdzsDevices.value.some((d) => d.id === savedDev)) {
+    kdzsDeviceId.value = savedDev
+  } else {
+    const online = kdzsDevices.value.find((d) => d.online)
+    kdzsDeviceId.value = online?.id || kdzsDevices.value[0]?.id
+  }
+  const savedTpl = localStorage.getItem(KDZS_TEMPLATE_KEY) || ''
+  if (savedTpl && kdzsTemplates.value.some((t) => templateKey(t) === savedTpl)) {
+    kdzsTemplateKey.value = savedTpl
+  } else if (kdzsTemplates.value[0]) {
+    kdzsTemplateKey.value = templateKey(kdzsTemplates.value[0])
+  }
 }
 
 async function goManualShip() {
@@ -939,6 +1116,72 @@ async function goQuick() {
   }
 }
 
+async function goKdzsPrint() {
+  if (!order.value || !kdzsDeviceId.value) return
+  const snapshot = buildSnapshot()
+  if (!snapshot) return
+  const device = kdzsDeviceView.value
+  if (!device) {
+    showFailToast('请选择打单电脑')
+    return
+  }
+  if (!device.online) {
+    showFailToast('电脑离线，请确认扩展已打开并保持心跳')
+    return
+  }
+  const tpl = kdzsTemplateView.value
+  if (!tpl?.templateName && !tpl?.templateId) {
+    showFailToast('请选择快递模板')
+    return
+  }
+  const timeRange = buildKdzsOrderTimeRange(order.value)
+  const payload: Record<string, unknown> = {
+    v: 1,
+    createdAt: Date.now(),
+    platform: orderPlatformCode(order.value),
+    templateName: tpl.templateName || '',
+    templateId: tpl.templateId,
+    orders: [
+      {
+        orderNo: order.value.orderNo || '',
+        platformSysTid: order.value.platformSysTid || '',
+        platformOrderId: order.value.platformOrderId || '',
+        sysTid: order.value.platformSysTid || '',
+        tid: order.value.platformOrderId || '',
+        payTime: order.value.payTime || '',
+        orderedAt: order.value.orderedAt || '',
+        goods: (snapshot.goods || []).map((g) => {
+          const name = (g.skuName || g.title || '').trim()
+          return {
+            title: name,
+            skuName: name,
+            outerId: g.outerId,
+            num: g.num,
+          }
+        }),
+      },
+    ],
+    orderTimeFrom: timeRange?.from,
+    orderTimeTo: timeRange?.to,
+    autoPrint: false,
+  }
+  submitting.value = true
+  try {
+    localStorage.setItem(KDZS_DEVICE_KEY, String(kdzsDeviceId.value))
+    if (kdzsTemplateKey.value) localStorage.setItem(KDZS_TEMPLATE_KEY, kdzsTemplateKey.value)
+    const task = await shippingApi.createKdzsPrintTask({
+      deviceId: kdzsDeviceId.value,
+      payload,
+    })
+    showSuccessToast(`已下发任务 #${task.id}，电脑将自动勾选订单`)
+    await router.replace('/pending')
+  } catch (e) {
+    showFailToast((e as Error).message || '下发失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
 async function submit() {
   if (!order.value || selectedKeys.value.length === 0) {
     showFailToast('请先勾选要发货的商品')
@@ -946,6 +1189,10 @@ async function submit() {
   }
   if (shipMode.value === 'manual') {
     await goManualShip()
+    return
+  }
+  if (shipMode.value === 'kdzs') {
+    await goKdzsPrint()
     return
   }
   if (!carrierAccountId.value || !shipperProfileId.value) {
@@ -1219,7 +1466,20 @@ onMounted(async () => {
 .mode-radios {
   padding: 12px 16px;
   justify-content: flex-start !important;
-  gap: 16px !important;
+  gap: 12px 16px !important;
+  flex-wrap: wrap;
+}
+.mode-radios--wrap :deep(.van-radio) {
+  margin-right: 0;
+}
+.link-inline {
+  border: 0;
+  background: transparent;
+  color: var(--ops-primary);
+  font-size: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
 }
 .tip {
   padding: 0 16px 12px;
@@ -1323,6 +1583,10 @@ onMounted(async () => {
   background: var(--ops-primary-soft);
   padding: 1px 6px;
   border-radius: 999px;
+}
+.mini-tag--off {
+  color: #b45309;
+  background: #fff7ed;
 }
 .sheet {
   padding: 16px 16px calc(16px + var(--ops-safe-bottom));

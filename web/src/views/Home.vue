@@ -78,6 +78,14 @@ const apps = [
     gradient: 'linear-gradient(145deg, #4338ca, #6366f1)',
     glow: 'rgba(99, 102, 241, 0.26)',
   },
+  {
+    path: '/kdzs-print',
+    title: '快递助手插件',
+    desc: '绑定电脑 · 远程打单',
+    icon: 'cluster-o',
+    gradient: 'linear-gradient(145deg, #b45309, #f59e0b)',
+    glow: 'rgba(245, 158, 11, 0.28)',
+  },
 ]
 
 function go(path: string) {

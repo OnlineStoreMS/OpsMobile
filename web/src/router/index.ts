@@ -72,6 +72,12 @@ const router = createRouter({
       component: () => import('../views/PrinterSettings.vue'),
       meta: { title: '打印机管理', hideTabbar: true },
     },
+    {
+      path: '/kdzs-print',
+      name: 'KdzsPrintSettings',
+      component: () => import('../views/KdzsPrintSettings.vue'),
+      meta: { title: '快递助手插件', hideTabbar: true },
+    },
 
     // —— 仓储子页 ——
     {

@@ -426,4 +426,56 @@ export const shippingApi = {
     }
     return blob.type ? blob : new Blob([blob], { type: 'application/pdf' })
   },
+
+  listExpressTemplates: (params?: Record<string, unknown>) =>
+    page<ExpressTemplate>('/express-templates', params),
+
+  createKdzsPrintPairSession: () =>
+    shippingClient.post('/kdzs-print/pair-sessions').then((r) =>
+      unwrap<{ pairCode: string; expireAt: string }>(r),
+    ),
+  listKdzsPrintDevices: () =>
+    shippingClient.get('/kdzs-print/devices').then((r) =>
+      unwrap<{ list: KdzsPrintDevice[]; total: number }>(r),
+    ),
+  renameKdzsPrintDevice: (id: number, name: string) =>
+    shippingClient.put(`/kdzs-print/devices/${id}`, { name }).then((r) => unwrap<KdzsPrintDevice>(r)),
+  unbindKdzsPrintDevice: (id: number) =>
+    shippingClient.delete(`/kdzs-print/devices/${id}`).then((r) => unwrap<{ ok: boolean }>(r)),
+  createKdzsPrintTask: (body: { deviceId: number; payload: Record<string, unknown> }) =>
+    shippingClient.post('/kdzs-print/tasks', body).then((r) => unwrap<KdzsPrintTask>(r)),
+  listKdzsPrintTasks: () =>
+    shippingClient.get('/kdzs-print/tasks').then((r) =>
+      unwrap<{ list: KdzsPrintTask[]; total: number }>(r),
+    ),
+}
+
+export interface ExpressTemplate {
+  id?: number
+  templateId?: string
+  templateName?: string
+  platform?: string
+  carrierCode?: string
+  carrierName?: string
+  shopName?: string
+  enabled?: boolean
+}
+
+export interface KdzsPrintDevice {
+  id: number
+  deviceKey: string
+  name: string
+  online: boolean
+  lastSeenAt?: string
+  enabled: boolean
+  createdAt: string
+}
+
+export interface KdzsPrintTask {
+  id: number
+  deviceId: number
+  status: string
+  payload?: unknown
+  errorMessage?: string
+  createdAt: string
 }
