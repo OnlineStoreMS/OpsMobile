@@ -9,7 +9,7 @@
           left-icon="info-o"
           background="rgba(15, 118, 110, 0.1)"
           color="#0f766e"
-          text="提交后自动分配自营，不同步快递助手；请用「打单发货」自建物流发货。"
+          text="提交后同步推送到快递助手并分配自营，可在「打单发货」用快递助手打单。"
         />
 
         <div class="section-label" style="margin-top: 14px">智能填单</div>
@@ -569,8 +569,8 @@ async function submit() {
       buyerTel: form.buyerTel,
       remark: form.remark,
       saveCustomer: saveCustomer.value,
-      // 手机端默认只走自建物流：本地建单并分配自营，不同步快递助手
-      syncKdzs: false,
+      // 与电脑端订单中心「创建并推送」一致：默认同步快递助手（type=1 创建并推单）
+      syncKdzs: true,
       createAction: 'create_and_push',
       printMode: 'carrier',
       manualSourceId: manualSourceId.value || undefined,
@@ -590,7 +590,7 @@ async function submit() {
     created.value = {
       orderNo: order.orderNo,
       orderId: order.id,
-      tip: '已创建并分配自营（未同步快递助手）',
+      tip: '已创建、同步快递助手并分配自营',
     }
   } catch (e: any) {
     closeToast()

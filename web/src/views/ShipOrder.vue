@@ -1149,6 +1149,14 @@ async function goKdzsPrint() {
     await router.push('/kdzs-print')
     return
   }
+  // 手工单必须有快递助手系统编号/订单编号，否则插件无法精确勾选（会误打别的单）
+  const plat = orderPlatformCode(order.value)
+  const sysTid = (order.value.platformSysTid || '').trim()
+  const platOid = (order.value.platformOrderId || '').trim()
+  if (plat === 'DFHAND' && !sysTid && !platOid) {
+    showFailToast('该手工单尚未同步快递助手编号，请先在「新建手工单」推送成功后再打单')
+    return
+  }
   const timeRange = buildKdzsOrderTimeRange(order.value)
   const payload: Record<string, unknown> = {
     v: 1,
