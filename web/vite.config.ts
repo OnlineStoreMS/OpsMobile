@@ -42,6 +42,16 @@ const proxy: Record<string, object> = {
     changeOrigin: true,
     rewrite: (path: string) => path.replace(/^\/apps\/todo\/api/, '/api'),
   },
+  '/apps/storesync/api': {
+    target: 'http://localhost:8097',
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/apps\/storesync\/api/, '/api'),
+  },
+  '/apps/store/api': {
+    target: 'http://localhost:8094',
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/apps\/store\/api/, '/api'),
+  },
 }
 
 export default defineConfig({

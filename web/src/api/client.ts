@@ -14,7 +14,16 @@ export interface PageData<T> {
   pageSize: number
 }
 
-export type AppApi = 'order' | 'self' | 'shipping' | 'warehouse' | 'supply' | 'material' | 'todo'
+export type AppApi =
+  | 'order'
+  | 'self'
+  | 'shipping'
+  | 'warehouse'
+  | 'supply'
+  | 'material'
+  | 'todo'
+  | 'storesync'
+  | 'store'
 
 function apiBase(app: AppApi): string {
   return `/apps/${app}/api/v1/admin`
@@ -65,6 +74,8 @@ export const warehouseClient = createClient('warehouse')
 export const supplyClient = createClient('supply')
 export const materialClient = createClient('material')
 export const todoClient = createClient('todo')
+export const storesyncClient = createClient('storesync')
+export const storeClient = createClient('store')
 
 export function unwrap<T>(res: { data: ApiResponse<T> }): T {
   return res.data.data as T

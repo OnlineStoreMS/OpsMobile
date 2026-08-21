@@ -268,6 +268,34 @@ const router = createRouter({
       component: () => import('../views/todo/CategoryList.vue'),
       meta: { title: '待办分类', hideTabbar: true },
     },
+
+    // —— 电商店铺同步子页 ——
+    {
+      path: '/storesync/products',
+      name: 'StoreSyncProducts',
+      component: () => import('../views/storesync/ProductList.vue'),
+      meta: { title: '电商商品', hideTabbar: true },
+    },
+    {
+      path: '/storesync/refunds',
+      name: 'StoreSyncRefunds',
+      component: () => import('../views/storesync/RefundList.vue'),
+      meta: { title: '售后列表', hideTabbar: true },
+    },
+
+    // —— 门店管理子页 ——
+    {
+      path: '/store/cashier',
+      name: 'StoreCashier',
+      component: () => import('../views/store/Cashier.vue'),
+      meta: { title: '收银台', hideTabbar: true },
+    },
+    {
+      path: '/store/services',
+      name: 'StoreServices',
+      component: () => import('../views/store/ServiceCatalog.vue'),
+      meta: { title: '服务目录', hideTabbar: true },
+    },
   ],
 })
 

@@ -5,6 +5,8 @@ import OrderHome from './views/order/OrderHome.vue'
 import SupplyHome from './views/supply/SupplyHome.vue'
 import MaterialHome from './views/material/MaterialHome.vue'
 import TodoHome from './views/todo/TodoHome.vue'
+import StoreSyncHome from './views/storesync/StoreSyncHome.vue'
+import StoreHome from './views/store/StoreHome.vue'
 
 /**
  * OpsMobile 顶层大页（安卓 ViewPager）。
@@ -49,6 +51,20 @@ export const hubPages: HubPageDef[] = [
     title: '供应链中心',
     short: '供应链',
     component: SupplyHome,
+  },
+  {
+    path: '/storesync',
+    name: 'StoreSyncHome',
+    title: '电商店铺同步',
+    short: '电商店铺',
+    component: StoreSyncHome,
+  },
+  {
+    path: '/store',
+    name: 'StoreHome',
+    title: '门店管理',
+    short: '门店',
+    component: StoreHome,
   },
   {
     path: '/material',
