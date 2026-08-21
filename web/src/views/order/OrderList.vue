@@ -76,7 +76,13 @@
 
           <div class="goods-preview" v-if="rootItems(row).length">
             <div v-for="it in rootItems(row).slice(0, 3)" :key="it.id || it.skuCode" class="goods-preview__row">
-              <img v-if="it.picUrl" :src="it.picUrl" alt="" />
+              <img
+                v-if="it.picUrl"
+                class="pic-preview"
+                :src="it.picUrl"
+                alt=""
+                @click.stop="previewProductImage(it.picUrl, rootItems(row).map((g) => g.picUrl))"
+              />
               <div class="goods-preview__info">
                 <div class="goods-preview__title">{{ listItemTitle(it) }}</div>
                 <div class="muted" v-if="listItemMeta(it).spec">{{ listItemMeta(it).spec }}</div>
@@ -291,6 +297,7 @@ import {
   formatAddress,
   isMaskedReceiver,
 } from '../../utils/orderCopy'
+import { previewProductImage } from '../../utils/previewProductImage'
 import { daysAgo, toApiDateTimeRange, todayDay } from '../../utils/dateRange'
 
 const router = useRouter()

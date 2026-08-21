@@ -53,7 +53,13 @@
       <div class="card">
         <template v-for="row in itemTree" :key="row.key">
           <div class="goods-row" :class="{ 'goods-row--child': row.isSplitChild, 'goods-row--cancelled': row.item.cancelled }">
-            <img v-if="row.item.picUrl" :src="row.item.picUrl" alt="" />
+            <img
+              v-if="row.item.picUrl"
+              class="pic-preview"
+              :src="row.item.picUrl"
+              alt=""
+              @click.stop="previewProductImage(row.item.picUrl, itemTreePics)"
+            />
             <div v-else class="goods-placeholder">图</div>
             <div class="goods-info">
               <div class="goods-name">
@@ -241,6 +247,7 @@ import {
   isMaskedReceiver,
 } from '../../utils/supplyOrderCopy'
 import { copyTextForUser } from '../../utils/copyFallback'
+import { previewProductImage } from '../../utils/previewProductImage'
 
 const router = useRouter()
 const route = useRoute()
@@ -275,6 +282,7 @@ const filteredExpressCompanies = computed(() => {
 const isDropship = computed(() => detail.value?.fulfillmentType === 'dropship')
 const navTitle = computed(() => (isDropship.value ? '代发单详情' : '采购单详情'))
 const itemTree = computed(() => buildPoItemTree(detail.value?.items))
+const itemTreePics = computed(() => itemTree.value.map((r) => r.item.picUrl).filter(Boolean) as string[])
 
 const linkedSales = computed(() => {
   const po = detail.value

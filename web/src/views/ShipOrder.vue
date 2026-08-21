@@ -57,7 +57,13 @@
                 <van-icon v-if="selectedKeys.includes(row.key)" name="success" />
               </span>
             </button>
-            <img v-if="row.picUrl" :src="row.picUrl" alt="" />
+            <img
+              v-if="row.picUrl"
+              class="pic-preview"
+              :src="row.picUrl"
+              alt=""
+              @click.stop="previewProductImage(row.picUrl, shipPickRows.map((r) => r.picUrl))"
+            />
             <div class="goods-info">
               <div class="goods-name">
                 {{ row.label }}
@@ -418,7 +424,13 @@
             class="split-item"
           >
             <div class="split-item__hd">
-              <img v-if="item.picUrl" :src="item.picUrl" alt="" />
+              <img
+                v-if="item.picUrl"
+                class="pic-preview"
+                :src="item.picUrl"
+                alt=""
+                @click.stop="previewProductImage(item.picUrl, splitRootItems.map((g) => g.picUrl))"
+              />
               <div class="split-item__name">{{ item.skuSpecs || item.productName || '商品' }} ×{{ item.quantity || 1 }}</div>
               <button
                 v-if="item.id"
@@ -494,6 +506,7 @@ import {
 import { printShipmentByChannel } from '../utils/sfPrintLabel'
 import { getSavedPrinterIndex, getSavedPrinterName } from '../utils/sfPrintPlugin'
 import { readKdzsPrinterName } from '../utils/kdzsPrinter'
+import { previewProductImage } from '../utils/previewProductImage'
 
 type ShipPickRow = ReturnType<typeof buildShipPickRows>[number]
 type SplitDraftLine = {

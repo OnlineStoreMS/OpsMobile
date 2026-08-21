@@ -5,7 +5,7 @@
         <span v-if="isDropship" class="nav-action" @click="toggleSelectMode">{{ selectMode ? '取消' : '多选' }}</span>
       </template>
     </van-nav-bar>
-    <div class="list-shell">
+    <div class="list-shell" :class="{ 'list-shell--batch': selectMode && isDropship }">
       <van-search v-model="keyword" shape="round" placeholder="单号 / 供应商 / 销售单" show-action @search="reload">
         <template #action>
           <div class="search-action" @click="reload">搜索</div>
@@ -30,12 +30,19 @@
         </button>
       </div>
 
+      <div v-if="selectMode && isDropship" class="merge-hint muted">
+        勾选同供应商、已关联销售单、未付款的代发单，可合并为一张
+      </div>
+
       <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
         <div
           v-for="row in list"
           :key="row.id"
           class="order-card"
-          :class="{ 'order-card--selected': selectedIds.has(row.id) }"
+          :class="{
+            'order-card--selected': selectedIds.has(row.id),
+            'order-card--disabled': selectMode && !isMergeable(row),
+          }"
           @click="onCardClick(row)"
         >
           <div class="order-card__top">
@@ -43,8 +50,9 @@
               <van-checkbox
                 v-if="selectMode"
                 :model-value="selectedIds.has(row.id)"
+                :disabled="!isMergeable(row)"
                 @click.stop
-                @update:model-value="(v: boolean) => toggleSelect(row.id, v)"
+                @update:model-value="(v: boolean) => onToggleSelect(row, v)"
               />
               <div class="order-card__no">{{ row.poNo }}</div>
             </div>
@@ -79,8 +87,14 @@
       </van-list>
     </div>
 
-    <div v-if="selectMode && isDropship" class="batch-bar footer-safe">
-      <div class="batch-bar__info">已选 {{ selectedIds.size }}</div>
+    <div v-if="selectMode && isDropship" class="batch-bar">
+      <div class="batch-bar__info">
+        <template v-if="selectedIds.size">
+          已选 {{ selectedIds.size }}
+          <span v-if="mergeBlockReason" class="batch-bar__warn"> · {{ mergeBlockReason }}</span>
+        </template>
+        <template v-else>勾选同供应商代发单后合并</template>
+      </div>
       <van-button size="small" type="primary" round :disabled="!canMerge" :loading="merging" @click="doMerge">
         合并代发单
       </van-button>
@@ -141,12 +155,22 @@ const emptyText = computed(() =>
 
 const selectedRows = computed(() => list.value.filter((r) => selectedIds.value.has(r.id)))
 
+/** 与电脑端一致：代发 + 未付款 + 已关联销售单；且所选须同一供应商 */
 const canMerge = computed(() => {
   const rows = selectedRows.value
   if (rows.length < 2) return false
   if (!rows.every((r) => isMergeable(r))) return false
   const sid = rows[0]?.supplierId
-  return rows.every((r) => r.supplierId === sid)
+  return !!sid && rows.every((r) => r.supplierId === sid)
+})
+
+const mergeBlockReason = computed(() => {
+  const rows = selectedRows.value
+  if (rows.length < 2) return rows.length === 1 ? '至少再选 1 张' : ''
+  if (!rows.every((r) => isMergeable(r))) return '含不可合并单据'
+  const sid = rows[0]?.supplierId
+  if (!sid || !rows.every((r) => r.supplierId === sid)) return '须同一供应商'
+  return ''
 })
 
 function isMergeable(row: PurchaseOrderListItem) {
@@ -187,16 +211,31 @@ function toggleSelectMode() {
   if (!selectMode.value) selectedIds.value = new Set()
 }
 
-function toggleSelect(id: number, on: boolean) {
+function onToggleSelect(row: PurchaseOrderListItem, on: boolean) {
+  if (!isMergeable(row)) {
+    showFailToast('仅未付款且已关联销售单的代发单可合并')
+    return
+  }
+  if (on && selectedIds.value.size > 0) {
+    const first = selectedRows.value[0] || list.value.find((r) => selectedIds.value.has(r.id))
+    if (first && first.supplierId !== row.supplierId) {
+      showFailToast(`请选择同一供应商（当前已选：${first.supplierName || first.supplierId}）`)
+      return
+    }
+  }
   const next = new Set(selectedIds.value)
-  if (on) next.add(id)
-  else next.delete(id)
+  if (on) next.add(row.id)
+  else next.delete(row.id)
   selectedIds.value = next
 }
 
 function onCardClick(row: PurchaseOrderListItem) {
   if (selectMode.value) {
-    toggleSelect(row.id, !selectedIds.value.has(row.id))
+    if (!isMergeable(row)) {
+      showFailToast('仅未付款且已关联销售单的代发单可合并')
+      return
+    }
+    onToggleSelect(row, !selectedIds.value.has(row.id))
     return
   }
   router.push(`/supply/purchase-orders/${row.id}`)
@@ -257,7 +296,7 @@ async function copyRow(row: PurchaseOrderListItem) {
 
 async function doMerge() {
   if (!canMerge.value) {
-    showFailToast('请选择同供应商、已关联销售单、未付款的代发单')
+    showFailToast(mergeBlockReason.value || '请选择同供应商、已关联销售单、未付款的代发单')
     return
   }
   const rows = selectedRows.value
@@ -265,7 +304,7 @@ async function doMerge() {
   try {
     await showConfirmDialog({
       title: '合并代发单',
-      message: `将合并为第一张：${nos}`,
+      message: `将合并以下代发单为第一张：${nos}。销售订单关联会一并更新。`,
     })
   } catch {
     return
@@ -274,7 +313,8 @@ async function doMerge() {
   try {
     const ids = rows.map((r) => r.id)
     const result = await supplyApi.mergePOs({ sourcePoIds: ids, targetPoId: ids[0] })
-    showSuccessToast(`已合并为 ${result.poNo}`)
+    const extra = result.relinked ? `（回写 ${result.relinked} 笔销售单）` : ''
+    showSuccessToast(`已合并为 ${result.poNo}${extra}`)
     selectMode.value = false
     selectedIds.value = new Set()
     reload()
@@ -334,6 +374,9 @@ watch(
   color: var(--ops-primary);
   padding: 0 4px;
 }
+.list-shell--batch {
+  padding-bottom: calc(64px + var(--ops-safe-bottom));
+}
 .range-block {
   padding-top: 4px;
 }
@@ -341,6 +384,11 @@ watch(
   font-size: 12px;
   color: var(--ops-muted);
   padding: 0 16px 2px;
+}
+.merge-hint {
+  padding: 0 16px 8px;
+  font-size: 12px;
+  line-height: 1.4;
 }
 .status-bar {
   display: flex;
@@ -371,6 +419,9 @@ watch(
 .order-card--selected {
   border-color: rgba(15, 118, 110, 0.45);
   box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.2);
+}
+.order-card--disabled {
+  opacity: 0.72;
 }
 .order-card__top {
   display: flex;
@@ -420,19 +471,26 @@ watch(
   font-weight: 700;
 }
 .batch-bar {
-  position: sticky;
+  position: fixed;
+  left: 0;
+  right: 0;
   bottom: 0;
-  z-index: 20;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px calc(10px + var(--ops-safe-bottom));
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.98);
   border-top: 1px solid var(--ops-line);
+  backdrop-filter: blur(8px);
 }
 .batch-bar__info {
   font-size: 12px;
   color: var(--ops-muted);
   margin-right: auto;
+  min-width: 0;
+}
+.batch-bar__warn {
+  color: var(--ops-warn, #ea580c);
 }
 </style>

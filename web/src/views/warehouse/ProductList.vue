@@ -14,7 +14,13 @@
       <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
         <div v-for="row in list" :key="row.id" class="order-card" @click="router.push(`/warehouse/products/${row.id}`)">
           <div class="prod-row">
-            <img v-if="row.pic" :src="row.pic" class="prod-pic" alt="" />
+            <img
+              v-if="row.pic"
+              :src="row.pic"
+              class="prod-pic pic-preview"
+              alt=""
+              @click.stop="previewProductImage(row.pic)"
+            />
             <div class="prod-pic prod-pic--empty" v-else>无图</div>
             <div class="prod-body">
               <div class="order-card__no">{{ row.parentSku || row.parent_sku }}</div>
@@ -35,6 +41,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
 import { whApi } from '../../api/warehouse'
+import { previewProductImage } from '../../utils/previewProductImage'
 
 const router = useRouter()
 const keyword = ref('')

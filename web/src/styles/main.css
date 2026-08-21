@@ -417,6 +417,15 @@ body {
   object-fit: cover;
   background: #eef2f5;
 }
+.goods-row img.pic-preview,
+img.pic-preview {
+  cursor: zoom-in;
+  -webkit-tap-highlight-color: transparent;
+}
+.goods-row img.pic-preview:active,
+img.pic-preview:active {
+  opacity: 0.85;
+}
 .goods-info {
   flex: 1;
   min-width: 0;

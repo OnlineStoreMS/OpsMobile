@@ -50,7 +50,13 @@
       <div class="section-label">商品明细</div>
       <div class="card">
         <div v-for="row in goodsRows" :key="row.key" class="goods-row">
-          <img v-if="row.picUrl" :src="row.picUrl" alt="" />
+          <img
+            v-if="row.picUrl"
+            class="pic-preview"
+            :src="row.picUrl"
+            alt=""
+            @click.stop="previewProductImage(row.picUrl, goodsRows.map((r) => r.picUrl))"
+          />
           <div class="goods-info">
             <div class="goods-name">
               {{ row.title }}
@@ -85,6 +91,7 @@ import { showFailToast, showLoadingToast, closeToast } from 'vant'
 import { getOmsOrder, listPendingOmsOrders, shippingApi, type OMSOrder } from '../api/shipping'
 import { formatOrderSource, formatTime, labelOmsStatus, labelShipStatus } from '../utils/labels'
 import { healShipPlanLines, orderGoodsDisplayRows } from '../utils/sfOrderHandoff'
+import { previewProductImage } from '../utils/previewProductImage'
 
 const route = useRoute()
 const router = useRouter()

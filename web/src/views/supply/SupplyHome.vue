@@ -51,7 +51,7 @@ const sections = [
       {
         path: '/supply/purchase-orders?fulfillmentType=dropship',
         title: '代发订单',
-        desc: '物流 · 拆分 · 解密复制',
+        desc: '合并 · 拆分 · 解密复制',
         icon: 'logistics',
         gradient: 'linear-gradient(145deg, #0f766e, #14b8a6)',
         glow: 'rgba(20, 184, 166, 0.28)',

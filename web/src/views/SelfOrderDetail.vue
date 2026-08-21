@@ -35,7 +35,13 @@
           class="goods-row"
           :class="{ 'goods-row--child': row.isSplitChild }"
         >
-          <img v-if="row.item.picUrl" :src="row.item.picUrl" alt="" />
+          <img
+            v-if="row.item.picUrl"
+            class="pic-preview"
+            :src="row.item.picUrl"
+            alt=""
+            @click.stop="previewProductImage(row.item.picUrl, goodsTreePics)"
+          />
           <div v-else class="goods-pic-placeholder" aria-hidden="true" />
           <div class="goods-info">
             <div class="goods-name" :class="{ 'goods-name--child': row.isSplitChild }">
@@ -249,6 +255,7 @@ import {
   deriveSelfShipStatus,
 } from '../utils/labels'
 import { buildSelfGoodsTreeRows, selfGoodsMeta, selfGoodsTitle } from '../utils/selfGoodsTree'
+import { previewProductImage } from '../utils/previewProductImage'
 
 const route = useRoute()
 const router = useRouter()
@@ -288,6 +295,7 @@ const itemById = computed(() => {
 })
 
 const goodsTreeRows = computed(() => buildSelfGoodsTreeRows(detail.value?.items))
+const goodsTreePics = computed(() => goodsTreeRows.value.map((r) => r.item.picUrl).filter(Boolean) as string[])
 
 const logisticsByItem = computed(() => {
   const map = new Map<number, string[]>()

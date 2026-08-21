@@ -78,7 +78,13 @@
         <template v-for="row in itemTree" :key="row.key">
           <div v-if="row.fullGroupHeader" class="split-header">{{ itemTreeTitle(row) }}</div>
           <div v-else class="goods-row" :class="{ 'goods-row--child': row.isSplitChild }">
-            <img v-if="row.item.picUrl" :src="row.item.picUrl" alt="" />
+            <img
+              v-if="row.item.picUrl"
+              class="pic-preview"
+              :src="row.item.picUrl"
+              alt=""
+              @click.stop="previewProductImage(row.item.picUrl, itemTreePics)"
+            />
             <div v-else class="goods-placeholder">图</div>
             <div class="goods-info">
               <div class="goods-name">
@@ -207,6 +213,7 @@ import {
   formatAddress,
   isMaskedReceiver,
 } from '../../utils/orderCopy'
+import { previewProductImage } from '../../utils/previewProductImage'
 
 const router = useRouter()
 const route = useRoute()
@@ -228,6 +235,7 @@ const canDecrypt = computed(() => {
   return !!o && canDecryptOrder(o)
 })
 const itemTree = computed(() => buildItemTreeRows(detail.value?.items))
+const itemTreePics = computed(() => itemTree.value.map((r) => r.item.picUrl).filter(Boolean) as string[])
 const splitRows = computed(() => itemTree.value.filter((r) => r.isSplitChild && !r.fullGroupHeader))
 const shipments = computed(() => detail.value?.shipments || [])
 const statusLogs = computed(() => detail.value?.statusLogs || [])

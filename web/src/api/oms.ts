@@ -168,7 +168,6 @@ export const SHIP_STATUS_OPTIONS = [
   { value: 'wait_ship', label: '待发货' },
   { value: 'partial_shipped', label: '部分发货' },
   { value: 'shipped', label: '已发货' },
-  { value: 'need_ship', label: '待发完' },
 ]
 
 export function labelOrderStatus(v?: string) {
