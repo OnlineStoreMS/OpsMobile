@@ -11,6 +11,7 @@
     <div class="page-body" v-else>
       <div v-if="handoffMeta?.orderId || form.orderNo" class="order-banner">
         已带入订单中心 {{ form.orderNo || `#${handoffMeta?.orderId}` }}
+        <span v-if="handoffMeta?.reship" class="banner-tag">重新发货 · 追加包裹</span>
       </div>
 
       <div class="section-label">寄件人</div>
@@ -403,7 +404,7 @@ const submitting = ref(false)
 const cancelling = ref(false)
 const carriers = ref<CarrierAccount[]>([])
 const shippers = ref<ShipperProfile[]>([])
-const handoffMeta = ref<Pick<SFOrderHandoff, 'orderId' | 'sourceSystem' | 'partialShip'> | null>(null)
+const handoffMeta = ref<Pick<SFOrderHandoff, 'orderId' | 'sourceSystem' | 'partialShip' | 'reship'> | null>(null)
 const preferredCarrierId = ref<number | undefined>()
 const preferredShipperId = ref<number | undefined>()
 const result = ref<{ shipmentId: number; mailNo: string; cancelled?: boolean } | null>(null)
@@ -726,6 +727,7 @@ function applyHandoff(h: SFOrderHandoff) {
     orderId: h.orderId,
     sourceSystem: h.sourceSystem,
     partialShip: h.partialShip,
+    reship: h.reship,
   }
   preferredCarrierId.value = h.carrierAccountId
   preferredShipperId.value = h.shipperProfileId
@@ -892,13 +894,16 @@ async function submit(doPrint: boolean) {
       orderId: handoffMeta.value?.orderId,
       sourceSystem:
         handoffMeta.value?.sourceSystem || (handoffMeta.value?.orderId ? 'ordercore' : undefined),
+      reship: !!handoffMeta.value?.reship,
       order,
     })
     const waybill = await shippingApi.createShipmentWaybill(shipment.id)
     result.value = { shipmentId: waybill.id, mailNo: waybill.mailNo || '' }
-    const okMsg = handoffMeta.value?.partialShip
-      ? `部分发货成功${waybill.mailNo ? `，${waybill.mailNo}` : ''}（可回待发货继续发剩余）`
-      : `下单成功${waybill.mailNo ? `，${waybill.mailNo}` : ''}`
+    const okMsg = handoffMeta.value?.reship
+      ? `重新发货成功${waybill.mailNo ? `，${waybill.mailNo}` : ''}（已追加到原订单）`
+      : handoffMeta.value?.partialShip
+        ? `部分发货成功${waybill.mailNo ? `，${waybill.mailNo}` : ''}（可回待发货继续发剩余）`
+        : `下单成功${waybill.mailNo ? `，${waybill.mailNo}` : ''}`
     showSuccessToast(okMsg)
     if (doPrint) {
       try {
@@ -977,6 +982,19 @@ onMounted(async () => {
   color: #613400;
   font-weight: 550;
   word-break: break-all;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.banner-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(180, 83, 9, 0.15);
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 600;
 }
 .pad {
   padding: 0 16px 12px;

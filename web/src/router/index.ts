@@ -55,6 +55,12 @@ const router = createRouter({
       meta: { title: '已发货详情', hideTabbar: true },
     },
     {
+      path: '/shipped/:id/reship',
+      name: 'Reship',
+      component: () => import('../views/Reship.vue'),
+      meta: { title: '重新发货', hideTabbar: true },
+    },
+    {
       path: '/ship/:orderId',
       name: 'ShipOrder',
       component: () => import('../views/ShipOrder.vue'),

@@ -106,6 +106,8 @@ export interface CreateShipmentFromOrderInput {
   sendStartTm?: string
   orderId?: number
   sourceSystem?: 'ordercore' | 'storesyncagent'
+  /** 重新发货：回写 OC 空明细追加包裹 */
+  reship?: boolean
   order: OrderSnapshot
 }
 
@@ -114,6 +116,8 @@ export interface ConfirmKdzsShipInput {
   expressNo: string
   expressCompany?: string
   order: OrderSnapshot
+  /** 重新发货：回写 OC 空明细追加包裹 */
+  reship?: boolean
 }
 
 export interface ShipmentItem {
@@ -160,9 +164,12 @@ export interface Shipment {
   labelPdfUrl?: string
   printChannel?: string
   items?: Array<{
+    id?: number
+    orderItemId?: number
     goodsName: string
     quantity: number
     skuCode: string
+    outerId?: string
   }>
 }
 
@@ -359,6 +366,11 @@ export const shippingApi = {
     shippingClient.post('/shipments/from-order', body).then((r) => unwrap<Shipment>(r)),
   createShipmentWaybill: (id: number) =>
     shippingClient.post(`/shipments/${id}/create-waybill`).then((r) => unwrap<Shipment>(r)),
+  /** 重新发货预填：原发货单 + OrderCore 订单 */
+  getReshipContext: (id: number) =>
+    shippingClient.get(`/shipments/${id}/reship-context`).then((r) =>
+      unwrap<{ shipment: Shipment; order: OMSOrder }>(r),
+    ),
   /** 手动/快递助手回填运单号发货（支持勾选部分商品） */
   confirmKdzsShip: (body: ConfirmKdzsShipInput) =>
     shippingClient.post('/shipments/confirm-kdzs-ship', body).then((r) => unwrap<Shipment>(r)),

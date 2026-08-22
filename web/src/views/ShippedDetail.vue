@@ -106,7 +106,16 @@
         </div>
       </div>
 
-      <div class="footer-safe" v-if="showSFOps && (canReprint || canCancel)">
+      <div class="footer-safe" v-if="canReship || (showSFOps && (canReprint || canCancel))">
+        <van-button
+          v-if="canReship"
+          type="warning"
+          block
+          round
+          @click="router.push(`/shipped/${detail!.id}/reship`)"
+        >
+          重新发货
+        </van-button>
         <van-button
           v-if="canReprint"
           type="primary"
@@ -131,6 +140,9 @@
         >
           取消快递单
         </van-button>
+        <div class="muted reprint-tip" v-if="canReship">
+          重新发货：可改地址/商品后打新单，原运单保留，新单号追加到原订单
+        </div>
         <div class="muted reprint-tip" v-if="canReprint">
           再次打印：用原运单号重打面单，不会重新取号、不会覆盖单号
         </div>
@@ -141,7 +153,7 @@
       <div class="footer-safe" v-else-if="detail.status === 'cancelled'">
         <div class="muted reprint-tip">运单已取消（保留记录，不可再打印）</div>
       </div>
-      <div class="footer-safe" v-else-if="isKdzs">
+      <div class="footer-safe" v-else-if="isKdzs && !canReship">
         <div class="muted reprint-tip">快递助手发货单：运单取消与打印请在快递助手完成</div>
       </div>
     </div>
@@ -258,6 +270,13 @@ const canCancel = computed(() => {
   const d = detail.value
   if (!d || !showSFOps.value) return false
   return d.status !== 'cancelled' && d.status !== 'draft'
+})
+
+/** 已出运单且绑定订单中心：可重新发货（顺丰 / 快递助手均可） */
+const canReship = computed(() => {
+  const d = detail.value
+  if (!d || d.status === 'cancelled') return false
+  return !!d.mailNo?.trim() && Number(d.orderCoreOrderId || 0) > 0
 })
 
 function shipStatusLabel(v?: string) {

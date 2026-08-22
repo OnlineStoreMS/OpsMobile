@@ -41,6 +41,17 @@
             <div class="order-card__time">发货时间 {{ shipTimeText(row) }}</div>
             <div class="order-card__actions" @click.stop>
               <van-button
+                v-if="canReship(row)"
+                size="mini"
+                type="warning"
+                plain
+                hairline
+                round
+                @click="router.push(`/shipped/${row.id}/reship`)"
+              >
+                重新发货
+              </van-button>
+              <van-button
                 v-if="canReprint(row)"
                 size="mini"
                 type="primary"
@@ -160,6 +171,10 @@ function canReprint(row: Shipment) {
 
 function canCancel(row: Shipment) {
   return row.status !== 'cancelled' && row.status !== 'draft' && !isKdzsShipment(row)
+}
+
+function canReship(row: Shipment) {
+  return !!row.mailNo?.trim() && row.status !== 'cancelled' && Number(row.orderCoreOrderId || 0) > 0
 }
 
 function printChannelOf(carrierId?: number, row?: Shipment | null) {
