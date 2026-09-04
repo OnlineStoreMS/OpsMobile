@@ -1,26 +1,26 @@
 <template>
   <div class="page">
-    <van-nav-bar class="ops-nav" title="快递助手插件" left-arrow @click-left="router.back()">
+    <van-nav-bar class="ops-nav" title="快递助手远程打单" left-arrow @click-left="router.back()">
       <template #right>
         <span class="nav-link" @click="refresh">刷新</span>
       </template>
     </van-nav-bar>
 
     <div class="page-body">
-      <div class="section-label">绑定打单电脑</div>
+      <div class="section-label">绑定打单电脑（Agent）</div>
       <div class="card">
         <div class="muted tip">
-          1. 电脑 Chrome 加载扩展目录 kdzs-print-mobile（名称：快递助手·手机版）→ 点「生成配对码」<br />
-          2. 在下方输入电脑显示的 6 位配对码并绑定<br />
-          3. 保持快递助手已登录、浏览器常开；设备显示「在线」后即可远程打单<br />
-          4. 发货中心电脑端请另装 kdzs-print-helper（电脑版），勿与手机版同时启用
+          1. 电脑安装并运行 WindowsAgent → 新建任务「快递助手远程打单」<br />
+          2. 填写快递助手用户名/密码与默认打印机 → 点「生成配对码」<br />
+          3. 在下方输入 6 位配对码并绑定；设备显示「在线」后即可远程打单<br />
+          4. Agent 会自动登录快递助手并领取打单任务（无需再装浏览器扩展）
         </div>
         <van-field
           v-model="pairCodeInput"
           type="digit"
           maxlength="6"
           label="配对码"
-          placeholder="输入电脑上的 6 位码"
+          placeholder="输入 Agent 上的 6 位码"
           clearable
         />
         <van-button block type="primary" :loading="pairing" @click="claimPair">绑定电脑</van-button>
@@ -30,7 +30,7 @@
       <div class="card">
         <div class="muted tip">
           填写电脑打印弹窗里的完整打印机名称（须一字不差）。<br />
-          下发打单任务时会带给扩展，自动选中后再点「打印快递单」。
+          下发任务时会带给 Agent；若 Agent 任务里已配置默认打印机，也可不填。
         </div>
         <van-field
           v-model="printerName"

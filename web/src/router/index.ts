@@ -82,7 +82,7 @@ const router = createRouter({
       path: '/kdzs-print',
       name: 'KdzsPrintSettings',
       component: () => import('../views/KdzsPrintSettings.vue'),
-      meta: { title: '快递助手插件', hideTabbar: true },
+      meta: { title: '快递助手远程打单', hideTabbar: true },
     },
 
     // —— 仓储子页 ——

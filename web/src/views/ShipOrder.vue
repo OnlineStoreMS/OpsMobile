@@ -151,14 +151,14 @@
           <button type="button" class="pick-row" @click="showKdzsDevice = true">
             <div class="pick-row__badge ship">机</div>
             <div class="pick-row__body">
-              <div class="pick-row__label">打单电脑</div>
+              <div class="pick-row__label">打单电脑（Agent）</div>
               <div v-if="kdzsDeviceView" class="pick-row__title">
                 {{ kdzsDeviceView.name }}
                 <span class="mini-tag" :class="kdzsDeviceView.online ? '' : 'mini-tag--off'">
                   {{ kdzsDeviceView.online ? '在线' : '离线' }}
                 </span>
               </div>
-              <div v-else class="muted">点击选择已绑定电脑</div>
+              <div v-else class="muted">点击选择已绑定 Agent</div>
               <div v-if="kdzsDeviceView" class="muted pick-row__sub">{{ kdzsDeviceView.deviceKey }}</div>
             </div>
             <span class="pick-row__arrow">›</span>
@@ -181,7 +181,7 @@
           </button>
           <div class="muted tip">
             任务下发到在线电脑；扩展自动勾选、按配置打印机打印并发货。
-            <button type="button" class="link-inline" @click="router.push('/kdzs-print')">绑定/打印机</button>
+            <button type="button" class="link-inline" @click="router.push('/kdzs-print')">绑定 Agent / 打印机</button>
             <span v-if="kdzsPrinterName" class="muted"> · 打印机 {{ kdzsPrinterName }}</span>
             <span v-else class="muted"> · 未配置打印机名</span>
           </div>
@@ -330,7 +330,7 @@
 
     <van-popup v-model:show="showKdzsDevice" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
       <div class="sheet">
-        <div class="sheet-title">选择打单电脑</div>
+        <div class="sheet-title">选择打单电脑（Agent）</div>
         <button
           v-for="d in kdzsDevices"
           :key="d.id"
@@ -347,7 +347,7 @@
         </button>
         <div v-if="!kdzsDevices.length" class="muted pad">
           暂无绑定设备，请先
-          <button type="button" class="link-inline" @click="router.push('/kdzs-print')">去绑定</button>
+          <button type="button" class="link-inline" @click="router.push('/kdzs-print')">去绑定 Agent</button>
         </div>
       </div>
     </van-popup>
@@ -653,13 +653,20 @@ function orderPlatformCode(o?: OMSOrder | null): string {
   return code || 'FXG'
 }
 
-function buildKdzsOrderTimeRange(o: OMSOrder): { from: string; to: string } | null {
-  const raw = o.payTime || o.orderedAt
+/** 取日历日，避免 ISO/Z 时区把付款日推到次日 */
+function calendarYmd(raw?: string): string | null {
   if (!raw) return null
+  const m = String(raw).match(/(\d{4})-(\d{2})-(\d{2})/)
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`
   const d = new Date(raw)
   if (Number.isNaN(d.getTime())) return null
   const p = (n: number) => String(n).padStart(2, '0')
-  const ymd = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+function buildKdzsOrderTimeRange(o: OMSOrder): { from: string; to: string } | null {
+  const ymd = calendarYmd(o.payTime || o.orderedAt)
+  if (!ymd) return null
   return { from: `${ymd} 00:00:00`, to: `${ymd} 23:59:59` }
 }
 
@@ -1143,11 +1150,11 @@ async function goKdzsPrint() {
   if (!snapshot) return
   const device = kdzsDeviceView.value
   if (!device) {
-    showFailToast('请选择打单电脑')
+    showFailToast('请选择打单电脑（Agent）')
     return
   }
   if (!device.online) {
-    showFailToast('电脑离线，请确认扩展已打开并保持心跳')
+    showFailToast('电脑离线，请确认 WindowsAgent 已运行并保持心跳')
     return
   }
   const tpl = kdzsTemplateView.value
@@ -1158,11 +1165,11 @@ async function goKdzsPrint() {
   const printer = readKdzsPrinterName()
   kdzsPrinterName.value = printer
   if (!printer) {
-    showFailToast('请先在「快递助手插件」页填写完整打印机名称')
+    showFailToast('请先在「快递助手远程打单」页填写完整打印机名称')
     await router.push('/kdzs-print')
     return
   }
-  // 手工单必须有快递助手系统编号/订单编号，否则插件无法精确勾选（会误打别的单）
+  // 手工单必须有快递助手系统编号/订单编号，否则无法精确勾选（会误打别的单）
   const plat = orderPlatformCode(order.value)
   const sysTid = (order.value.platformSysTid || '').trim()
   const platOid = (order.value.platformOrderId || '').trim()

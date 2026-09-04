@@ -147,7 +147,7 @@
             <button type="button" class="pick-row" @click="showKdzsDevice = true">
               <div class="pick-row__badge ship">机</div>
               <div class="pick-row__body">
-                <div class="pick-row__label">打单电脑</div>
+                <div class="pick-row__label">打单电脑（Agent）</div>
                 <div v-if="kdzsDeviceView" class="pick-row__title">
                   {{ kdzsDeviceView.name }}
                   <span class="mini-tag" :class="kdzsDeviceView.online ? '' : 'mini-tag--off'">
@@ -168,8 +168,8 @@
               <span class="pick-row__arrow">›</span>
             </button>
             <div class="muted tip">
-              下发后电脑扩展按手工单打面单；完成后在下方回填新运单号。
-              <button type="button" class="link-inline" @click="router.push('/kdzs-print')">插件设置</button>
+              下发后 WindowsAgent 按手工单打面单；完成后在下方回填新运单号。
+              <button type="button" class="link-inline" @click="router.push('/kdzs-print')">远程打单设置</button>
             </div>
             <van-field
               v-model="expressNo"
@@ -272,7 +272,7 @@
     </van-popup>
     <van-popup v-model:show="showKdzsDevice" position="bottom" round teleport="body" safe-area-inset-bottom>
       <div class="sheet">
-        <div class="sheet-title">打单电脑</div>
+        <div class="sheet-title">打单电脑（Agent）</div>
         <button
           v-for="d in kdzsDevices"
           :key="d.id"
@@ -285,7 +285,7 @@
             <span class="mini-tag" :class="d.online ? '' : 'mini-tag--off'">{{ d.online ? '在线' : '离线' }}</span>
           </div>
         </button>
-        <div v-if="!kdzsDevices.length" class="muted pad">暂无绑定电脑，请先配对</div>
+        <div v-if="!kdzsDevices.length" class="muted pad">暂无绑定电脑，请先在「快递助手远程打单」配对 Agent</div>
       </div>
     </van-popup>
     <van-popup v-model:show="showKdzsTemplate" position="bottom" round teleport="body" safe-area-inset-bottom>
@@ -619,12 +619,12 @@ async function confirmExpressAppend() {
 async function goKdzsTask() {
   const o = order.value
   if (!o || !kdzsDeviceId.value) {
-    showFailToast('请选择打单电脑')
+    showFailToast('请选择打单电脑（Agent）')
     return
   }
   const device = kdzsDeviceView.value
   if (!device?.online) {
-    showFailToast('电脑离线，请确认扩展在线')
+    showFailToast('电脑离线，请确认 WindowsAgent 在线')
     return
   }
   const tpl = kdzsTemplateView.value
