@@ -183,7 +183,7 @@
             任务下发到在线电脑；扩展自动勾选、按配置打印机打印并发货。
             <button type="button" class="link-inline" @click="router.push('/kdzs-print')">绑定 Agent / 打印机</button>
             <span v-if="kdzsPrinterName" class="muted"> · 打印机 {{ kdzsPrinterName }}</span>
-            <span v-else class="muted"> · 未配置打印机名</span>
+            <span v-else class="muted"> · 打印机用 Agent / 弹窗默认</span>
           </div>
         </div>
       </template>
@@ -1164,11 +1164,7 @@ async function goKdzsPrint() {
   }
   const printer = readKdzsPrinterName()
   kdzsPrinterName.value = printer
-  if (!printer) {
-    showFailToast('请先在「快递助手远程打单」页填写完整打印机名称')
-    await router.push('/kdzs-print')
-    return
-  }
+  // 可不填：优先用 Agent 任务默认打印机；都空则用快递助手弹窗当前默认
   // 手工单必须有快递助手系统编号/订单编号，否则无法精确勾选（会误打别的单）
   const plat = orderPlatformCode(order.value)
   const sysTid = (order.value.platformSysTid || '').trim()
@@ -1184,7 +1180,7 @@ async function goKdzsPrint() {
     platform: orderPlatformCode(order.value),
     templateName: tpl.templateName || '',
     templateId: tpl.templateId,
-    printerName: printer,
+    printerName: printer || '',
     orders: [
       {
         orderNo: order.value.orderNo || '',

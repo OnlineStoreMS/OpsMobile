@@ -11,7 +11,7 @@
       <div class="card">
         <div class="muted tip">
           1. 电脑安装并运行 WindowsAgent → 新建任务「快递助手远程打单」<br />
-          2. 填写快递助手用户名/密码与默认打印机 → 点「生成配对码」<br />
+          2. 填写快递助手用户名/密码（打印机可选）→ 点「生成配对码」<br />
           3. 在下方输入 6 位配对码并绑定；设备显示「在线」后即可远程打单<br />
           4. Agent 会自动登录快递助手并领取打单任务（无需再装浏览器扩展）
         </div>
@@ -29,13 +29,13 @@
       <div class="section-label">默认打印机</div>
       <div class="card">
         <div class="muted tip">
-          填写电脑打印弹窗里的完整打印机名称（须一字不差）。<br />
-          下发任务时会带给 Agent；若 Agent 任务里已配置默认打印机，也可不填。
+          选填。填写电脑打印弹窗里的完整打印机名称（须一字不差）。<br />
+          不填时：优先用 WindowsAgent 任务里的默认打印机；都未配置则用弹窗当前默认。
         </div>
         <van-field
           v-model="printerName"
           label="打印机"
-          placeholder="如 HPRT N31C"
+          placeholder="可留空（用 Agent 默认）"
           clearable
           maxlength="120"
         />
@@ -150,15 +150,11 @@ async function claimPair() {
 
 function savePrinter() {
   const name = printerName.value.trim()
-  if (!name) {
-    showFailToast('请填写完整打印机名称')
-    return
-  }
   savingPrinter.value = true
   try {
     writeKdzsPrinterName(name)
     printerName.value = name
-    showSuccessToast('打印机已保存')
+    showSuccessToast(name ? '打印机已保存' : '已清空，将使用 Agent / 弹窗默认')
   } finally {
     savingPrinter.value = false
   }

@@ -633,11 +633,7 @@ async function goKdzsTask() {
     return
   }
   const printer = readKdzsPrinterName()
-  if (!printer) {
-    showFailToast('请先配置打印机名称')
-    await router.push('/kdzs-print')
-    return
-  }
+  // 可不填：优先 Agent 任务默认打印机；都空则用弹窗当前默认
   const snap = buildSnapshot(o)
   const payload: Record<string, unknown> = {
     v: 1,
@@ -645,7 +641,7 @@ async function goKdzsTask() {
     platform: RESHIP_KDZS_PLATFORM,
     templateName: tpl.templateName || '',
     templateId: tpl.templateId,
-    printerName: printer,
+    printerName: printer || '',
     orders: [
       {
         orderNo: o.orderNo || '',
