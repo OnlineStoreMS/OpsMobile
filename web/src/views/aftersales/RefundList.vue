@@ -7,7 +7,7 @@
           <div class="search-action" @click="reload">搜索</div>
         </template>
       </van-search>
-      <ShopChips v-model="shopId" :shops="shops" @update:modelValue="reload" />
+      <ShopChips v-model="shopId" :shops="shops" :counts="shopCounts" :all-count="allShopCount" @update:modelValue="reload" />
       <div v-if="showStatus" class="status-bar">
         <button
           type="button"
@@ -75,6 +75,7 @@ import {
 import { daysAgo, todayDay, toApiDateTimeRange } from '../../utils/dateRange'
 import AsTicketCard from './AsTicketCard.vue'
 import ShopChips from './ShopChips.vue'
+import { loadShopChipCounts } from './shopCounts'
 
 type Mode = 'shipped' | 'return-refund' | 'intercept' | 'returns'
 type Row = AsCardRow & { id: number; shopId: number; platformAftersaleId: string; needIntercept?: boolean; awaitPickup?: boolean }
@@ -86,6 +87,8 @@ const shopId = ref<number | undefined>()
 const status = ref('')
 const datePreset = ref<'all' | '30d'>('all')
 const shops = ref<MarketplaceShop[]>([])
+const shopCounts = ref<Record<number, number>>({})
+const allShopCount = ref(0)
 const list = ref<Row[]>([])
 const loading = ref(false)
 const finished = ref(false)
@@ -118,12 +121,44 @@ function extraTagsOf(row: Row) {
 
 function setStatus(v: string) {
   status.value = v
+  void loadCounts()
   reload()
 }
 
 function setDate(v: 'all' | '30d') {
   datePreset.value = v
+  void loadCounts()
   reload()
+}
+
+async function fetchTotal(id?: number) {
+  const params = {
+    shopId: id,
+    page: 1,
+    pageSize: 1,
+    ...applyRange(),
+  }
+  if (mode.value === 'intercept') {
+    return (await aftersalesApi.fetchInterceptOrders(params)).total || 0
+  }
+  if (mode.value === 'returns') {
+    return (await aftersalesApi.fetchReturnPackages(params)).total || 0
+  }
+  if (mode.value === 'return-refund') {
+    return (await aftersalesApi.fetchReturnRefunds({ ...params, status: status.value || undefined })).total || 0
+  }
+  return (await aftersalesApi.fetchShippedRefunds({ ...params, status: status.value || undefined })).total || 0
+}
+
+async function loadCounts() {
+  try {
+    const data = await loadShopChipCounts(shops.value, fetchTotal)
+    shopCounts.value = data.counts
+    allShopCount.value = data.allCount
+  } catch {
+    shopCounts.value = {}
+    allShopCount.value = 0
+  }
 }
 
 async function loadShops() {
@@ -132,6 +167,7 @@ async function loadShops() {
   } catch {
     shops.value = []
   }
+  await loadCounts()
 }
 
 async function fetchPage() {

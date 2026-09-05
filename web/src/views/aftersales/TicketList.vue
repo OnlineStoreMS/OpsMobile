@@ -7,7 +7,7 @@
           <div class="search-action" @click="reload">搜索</div>
         </template>
       </van-search>
-      <ShopChips v-model="shopId" :shops="shops" @update:modelValue="reload" />
+      <ShopChips v-model="shopId" :shops="shops" :counts="shopCounts" :all-count="allShopCount" @update:modelValue="reload" />
       <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
         <AsTicketCard v-for="row in list" :key="row.id" :row="row" :now="nowTick" />
         <van-empty v-if="!loading && !list.length" description="暂无售后单" />
@@ -29,12 +29,15 @@ import {
 } from '../../api/aftersales'
 import AsTicketCard from './AsTicketCard.vue'
 import ShopChips from './ShopChips.vue'
+import { loadTicketKindShopCounts } from './shopCounts'
 
 const router = useRouter()
 const route = useRoute()
 const keyword = ref('')
 const shopId = ref<number | undefined>()
 const shops = ref<MarketplaceShop[]>([])
+const shopCounts = ref<Record<number, number>>({})
+const allShopCount = ref(0)
 const list = ref<AftersaleTicket[]>([])
 const loading = ref(false)
 const finished = ref(false)
@@ -54,6 +57,18 @@ async function loadShops() {
     shops.value = await aftersalesApi.fetchShops()
   } catch {
     shops.value = []
+  }
+  await loadCounts()
+}
+
+async function loadCounts() {
+  try {
+    const data = await loadTicketKindShopCounts(kind.value, shops.value)
+    shopCounts.value = data.counts
+    allShopCount.value = data.allCount
+  } catch {
+    shopCounts.value = {}
+    allShopCount.value = 0
   }
 }
 
@@ -91,6 +106,7 @@ watch(
   () => {
     keyword.value = ''
     shopId.value = undefined
+    void loadCounts()
     reload()
   },
 )

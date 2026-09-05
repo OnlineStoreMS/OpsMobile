@@ -7,7 +7,7 @@
           <div class="search-action" @click="reload">搜索</div>
         </template>
       </van-search>
-      <ShopChips v-model="shopId" :shops="shops" @update:modelValue="reload" />
+      <ShopChips v-model="shopId" :shops="shops" :counts="shopCounts" :all-count="allShopCount" @update:modelValue="reload" />
       <div class="status-bar">
         <button
           v-for="tab in SERVICE_TABS"
@@ -81,12 +81,15 @@ import {
 } from '../../api/aftersales'
 import { previewProductImage } from '../../utils/previewProductImage'
 import { formatTime, remainSecondsOf } from '../../utils/ticketLogistics'
+import { loadShopChipCounts } from './shopCounts'
 
 const router = useRouter()
 const route = useRoute()
 const keyword = ref('')
 const shopId = ref<number | undefined>()
 const shops = ref<MarketplaceShop[]>([])
+const shopCounts = ref<Record<number, number>>({})
+const allShopCount = ref(0)
 const list = ref<ServiceOrder[]>([])
 const tabs = ref<ServiceTabCount[]>([])
 const loading = ref(false)
@@ -155,12 +158,32 @@ function toggle(id: number) {
   expanded.value = expanded.value === id ? null : id
 }
 
+async function loadCounts() {
+  try {
+    const data = await loadShopChipCounts(shops.value, async (id) => {
+      const res = await aftersalesApi.fetchServiceOrders({
+        shopId: id,
+        statusTab: statusTab.value || undefined,
+        page: 1,
+        pageSize: 1,
+      })
+      return res.total || 0
+    })
+    shopCounts.value = data.counts
+    allShopCount.value = data.allCount
+  } catch {
+    shopCounts.value = {}
+    allShopCount.value = 0
+  }
+}
+
 async function loadShops() {
   try {
     shops.value = await aftersalesApi.fetchShops()
   } catch {
     shops.value = []
   }
+  await loadCounts()
 }
 
 async function loadMore() {
@@ -195,7 +218,10 @@ function reload() {
 
 watch(
   () => route.query.statusTab,
-  () => reload(),
+  () => {
+    void loadCounts()
+    reload()
+  },
 )
 
 onMounted(() => {
