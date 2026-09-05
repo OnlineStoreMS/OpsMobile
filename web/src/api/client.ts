@@ -24,6 +24,7 @@ export type AppApi =
   | 'todo'
   | 'storesync'
   | 'store'
+  | 'aftersales'
 
 function apiBase(app: AppApi): string {
   return `/apps/${app}/api/v1/admin`
@@ -76,6 +77,7 @@ export const materialClient = createClient('material')
 export const todoClient = createClient('todo')
 export const storesyncClient = createClient('storesync')
 export const storeClient = createClient('store')
+export const aftersalesClient = createClient('aftersales')
 
 export function unwrap<T>(res: { data: ApiResponse<T> }): T {
   return res.data.data as T

@@ -7,6 +7,7 @@ import MaterialHome from './views/material/MaterialHome.vue'
 import TodoHome from './views/todo/TodoHome.vue'
 import StoreSyncHome from './views/storesync/StoreSyncHome.vue'
 import StoreHome from './views/store/StoreHome.vue'
+import AfterSalesHome from './views/aftersales/AfterSalesHome.vue'
 
 /**
  * OpsMobile 顶层大页（安卓 ViewPager）。
@@ -58,6 +59,13 @@ export const hubPages: HubPageDef[] = [
     title: '电商店铺同步',
     short: '电商店铺',
     component: StoreSyncHome,
+  },
+  {
+    path: '/aftersales',
+    name: 'AfterSalesHome',
+    title: '售后中心',
+    short: '售后',
+    component: AfterSalesHome,
   },
   {
     path: '/store',

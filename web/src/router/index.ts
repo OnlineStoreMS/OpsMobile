@@ -275,6 +275,56 @@ const router = createRouter({
       meta: { title: '待办分类', hideTabbar: true },
     },
 
+    // —— 售后中心子页 ——
+    {
+      path: '/aftersales/shops',
+      name: 'AsShops',
+      component: () => import('../views/aftersales/ShopList.vue'),
+      meta: { title: '店铺列表', hideTabbar: true },
+    },
+    {
+      path: '/aftersales/shops/:id',
+      name: 'AsShopWorkbench',
+      component: () => import('../views/aftersales/ShopWorkbench.vue'),
+      meta: { title: '店铺工作台', hideTabbar: true },
+    },
+    {
+      path: '/aftersales/tickets',
+      name: 'AsTickets',
+      component: () => import('../views/aftersales/TicketList.vue'),
+      meta: { title: '售后单', hideTabbar: true },
+    },
+    {
+      path: '/aftersales/intercept',
+      name: 'AsIntercept',
+      component: () => import('../views/aftersales/RefundList.vue'),
+      meta: { title: '需商家拦截快递', hideTabbar: true, mode: 'intercept' },
+    },
+    {
+      path: '/aftersales/shipped-success',
+      name: 'AsShippedSuccess',
+      component: () => import('../views/aftersales/RefundList.vue'),
+      meta: { title: '已发货退款成功', hideTabbar: true, mode: 'shipped' },
+    },
+    {
+      path: '/aftersales/return-refunds',
+      name: 'AsReturnRefunds',
+      component: () => import('../views/aftersales/RefundList.vue'),
+      meta: { title: '退货退款成功', hideTabbar: true, mode: 'return-refund' },
+    },
+    {
+      path: '/aftersales/returns',
+      name: 'AsReturns',
+      component: () => import('../views/aftersales/RefundList.vue'),
+      meta: { title: '退回件', hideTabbar: true, mode: 'returns' },
+    },
+    {
+      path: '/aftersales/service-orders',
+      name: 'AsServiceOrders',
+      component: () => import('../views/aftersales/ServiceOrderList.vue'),
+      meta: { title: '服务工单', hideTabbar: true },
+    },
+
     // —— 电商店铺同步子页 ——
     {
       path: '/storesync/products',
