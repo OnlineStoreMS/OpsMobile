@@ -180,10 +180,17 @@ onMounted(async () => {
   padding-bottom: calc(56px + var(--ops-safe-bottom));
 }
 .tile-count {
+  display: inline-block;
   margin-left: 6px;
-  font-size: 11px;
-  font-weight: 700;
+  padding: 0 7px;
+  min-width: 1.4em;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
   color: #be123c;
+  background: rgba(225, 29, 72, 0.1);
+  border-radius: 999px;
   vertical-align: middle;
 }
 </style>
