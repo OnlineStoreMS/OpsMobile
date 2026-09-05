@@ -47,6 +47,13 @@ export const hubPages: HubPageDef[] = [
     component: OrderHome,
   },
   {
+    path: '/aftersales',
+    name: 'AfterSalesHome',
+    title: '售后中心',
+    short: '售后',
+    component: AfterSalesHome,
+  },
+  {
     path: '/supply',
     name: 'SupplyHome',
     title: '供应链中心',
@@ -59,13 +66,6 @@ export const hubPages: HubPageDef[] = [
     title: '电商店铺同步',
     short: '电商店铺',
     component: StoreSyncHome,
-  },
-  {
-    path: '/aftersales',
-    name: 'AfterSalesHome',
-    title: '售后中心',
-    short: '售后',
-    component: AfterSalesHome,
   },
   {
     path: '/store',
