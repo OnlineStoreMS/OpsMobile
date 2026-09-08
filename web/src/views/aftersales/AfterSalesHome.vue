@@ -58,7 +58,7 @@ const sections = computed(() => [
       {
         path: '/aftersales/shops',
         title: '店铺列表',
-        desc: counts.value?.ticketTotal ? `待处理 ${badgeText(counts.value.ticketTotal)}` : '绑定 · 同步 · 工作台',
+        desc: counts.value?.ticketTotal ? `待处理 ${badgeText(counts.value.ticketTotal)}` : 'Agents 采集 · 工作台',
         count: badgeText(counts.value?.ticketTotal),
         icon: 'shop-o',
         gradient: 'linear-gradient(145deg, #1e3a5f, #3b82f6)',

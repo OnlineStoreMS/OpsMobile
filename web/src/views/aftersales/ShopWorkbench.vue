@@ -2,14 +2,14 @@
   <div class="page">
     <van-nav-bar class="ops-nav" :title="shop?.name || '店铺工作台'" left-arrow @click-left="router.back()">
       <template #right>
-        <span class="nav-link" @click="requestSync">同步</span>
+        <span class="nav-link" @click="requestSync">立即执行</span>
       </template>
     </van-nav-bar>
     <div class="list-shell">
       <div class="list-hint">
         {{ shop ? PLUGIN_STATUS_MAP[shop.pluginStatus].label : '' }}
         · 最近同步 {{ formatTime(lastSyncAt) || '—' }}
-        <template v-if="shop?.syncRequested"> · 已请求同步</template>
+        <template v-if="shop?.syncRequested"> · 已请求立即执行</template>
       </div>
       <van-search v-model="keyword" shape="round" placeholder="售后编号 / 订单号 / 商品 / 物流" show-action @search="reload">
         <template #action>
@@ -132,7 +132,7 @@ async function requestSync() {
   if (!shopId.value) return
   try {
     await aftersalesApi.requestShopSync(shopId.value)
-    showSuccessToast('已请求同步')
+    showSuccessToast('已请求立即执行')
     reload()
   } catch (e: any) {
     showFailToast(e.message || '请求失败')

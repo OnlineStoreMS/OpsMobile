@@ -270,9 +270,19 @@ export const PLATFORM_OPTIONS: { value: ShopPlatform; label: string }[] = [
 ]
 
 export const PLUGIN_STATUS_MAP: Record<PluginStatus, { label: string; type: 'primary' | 'success' | 'warning' | 'danger' }> = {
-  unbound: { label: '未绑定', type: 'primary' },
-  online: { label: '在线', type: 'success' },
-  offline: { label: '离线', type: 'danger' },
+  unbound: { label: '未启用', type: 'primary' },
+  online: { label: '已启用', type: 'success' },
+  offline: { label: '已启用', type: 'success' },
+}
+
+export interface AgentOnlineShop {
+  platform: string
+  platformShopId: string
+  platformShopName: string
+  browserChannel: string
+  agentId: number
+  agentName: string
+  agentOnline: boolean
 }
 
 export const PLUGIN_SYNC_OPTIONS: { value: number; label: string }[] = [
@@ -302,13 +312,27 @@ export const aftersalesApi = {
     unwrap<PluginSetting>(await aftersalesClient.put('/plugin-settings', data)),
   fetchShops: async () => unwrap<MarketplaceShop[]>(await aftersalesClient.get('/shops')),
   fetchShop: async (id: number) => unwrap<MarketplaceShop>(await aftersalesClient.get(`/shops/${id}`)),
+  fetchAgentOnlineShops: async (platform?: string) =>
+    unwrap<AgentOnlineShop[]>(await aftersalesClient.get('/agent-online-shops', { params: { platform } })),
+  createShopFromAgent: async (data: {
+    platform: string
+    platformShopId: string
+    platformShopName?: string
+    jobType?: string
+    name?: string
+    intervalMinutes?: number
+  }) => unwrap<MarketplaceShop>(await aftersalesClient.post('/shops/from-agent', data)),
   createShop: async (data: { name: string; platform?: ShopPlatform; remark?: string }) =>
     unwrap<MarketplaceShop>(await aftersalesClient.post('/shops', data)),
-  updateShop: async (id: number, data: { name?: string; remark?: string }) =>
-    unwrap<MarketplaceShop>(await aftersalesClient.put(`/shops/${id}`, data)),
+  updateShop: async (
+    id: number,
+    data: { name?: string; platformShopId?: string; platformShopName?: string; remark?: string },
+  ) => unwrap<MarketplaceShop>(await aftersalesClient.put(`/shops/${id}`, data)),
   deleteShop: async (id: number) => unwrap<{ deleted: boolean }>(await aftersalesClient.delete(`/shops/${id}`)),
   resetShopBind: async (id: number) =>
     unwrap<MarketplaceShop>(await aftersalesClient.post(`/shops/${id}/reset-bind`)),
+  enableAgentCollect: async (id: number) =>
+    unwrap<MarketplaceShop>(await aftersalesClient.post(`/shops/${id}/enable-agent-collect`)),
   requestShopSync: async (id: number) =>
     unwrap<MarketplaceShop>(await aftersalesClient.post(`/shops/${id}/request-sync`)),
   fetchShopWorkbench: async (
