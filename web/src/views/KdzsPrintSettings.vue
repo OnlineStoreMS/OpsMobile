@@ -10,10 +10,9 @@
       <div class="section-label">绑定打单电脑（Agent）</div>
       <div class="card">
         <div class="muted tip">
-          1. 电脑安装并运行 WindowsAgent → 新建任务「快递助手远程打单」<br />
-          2. 填写快递助手用户名/密码（打印机可选）→ 点「生成配对码」<br />
-          3. 在下方输入 6 位配对码并绑定；设备显示「在线」后即可远程打单<br />
-          4. Agent 会自动登录快递助手并领取打单任务（无需再装浏览器扩展）
+          1. 电脑运行 WindowsAgent → 新建「快递助手远程打单」→ 生成配对码<br />
+          2. 在下方输入 6 位配对码绑定；设备「在线」后可在发货页选机器与模板打单<br />
+          3. 快递助手账号密码在发货中心维护，下发任务时自动注入（无需在 Agent 填写）
         </div>
         <van-field
           v-model="pairCodeInput"
