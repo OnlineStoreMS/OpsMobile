@@ -285,7 +285,7 @@
             <span class="mini-tag" :class="d.online ? '' : 'mini-tag--off'">{{ d.online ? '在线' : '离线' }}</span>
           </div>
         </button>
-        <div v-if="!kdzsDevices.length" class="muted pad">暂无绑定电脑，请先在「快递助手远程打单」配对 Agent</div>
+        <div v-if="!kdzsDevices.length" class="muted pad">暂无打单电脑。请确认 WindowsAgent 已连上 Agents 并在线</div>
       </div>
     </van-popup>
     <van-popup v-model:show="showKdzsTemplate" position="bottom" round teleport="body" safe-area-inset-bottom>

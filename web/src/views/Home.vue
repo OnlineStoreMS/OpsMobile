@@ -81,7 +81,7 @@ const apps = [
   {
     path: '/kdzs-print',
     title: '快递助手远程打单',
-    desc: '绑定 WindowsAgent · 远程打单',
+    desc: '在线 WA · 选机打单',
     icon: 'cluster-o',
     gradient: 'linear-gradient(145deg, #b45309, #f59e0b)',
     glow: 'rgba(245, 158, 11, 0.28)',

@@ -442,8 +442,6 @@ export const shippingApi = {
   listExpressTemplates: (params?: Record<string, unknown>) =>
     page<ExpressTemplate>('/express-templates', params),
 
-  claimKdzsPrintPair: (pairCode: string) =>
-    shippingClient.post('/kdzs-print/pair-claim', { pairCode }).then((r) => unwrap<KdzsPrintDevice>(r)),
   listKdzsPrintDevices: () =>
     shippingClient.get('/kdzs-print/devices').then((r) =>
       unwrap<{ list: KdzsPrintDevice[]; total: number }>(r),
@@ -474,6 +472,7 @@ export interface ExpressTemplate {
 export interface KdzsPrintDevice {
   id: number
   deviceKey: string
+  machineId?: string
   name: string
   online: boolean
   lastSeenAt?: string

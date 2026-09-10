@@ -158,7 +158,7 @@
                   {{ kdzsDeviceView.online ? '在线' : '离线' }}
                 </span>
               </div>
-              <div v-else class="muted">点击选择已绑定 Agent</div>
+              <div v-else class="muted">点击选择在线 Agent</div>
               <div v-if="kdzsDeviceView" class="muted pick-row__sub">{{ kdzsDeviceView.deviceKey }}</div>
             </div>
             <span class="pick-row__arrow">›</span>
@@ -181,7 +181,7 @@
           </button>
           <div class="muted tip">
             任务下发到在线电脑；扩展自动勾选、按配置打印机打印并发货。
-            <button type="button" class="link-inline" @click="router.push('/kdzs-print')">绑定 Agent / 打印机</button>
+            <button type="button" class="link-inline" @click="router.push('/kdzs-print')">打单机 / 打印机</button>
             <span v-if="kdzsPrinterName" class="muted"> · 打印机 {{ kdzsPrinterName }}</span>
             <span v-else class="muted"> · 打印机用 Agent / 弹窗默认</span>
           </div>
@@ -346,8 +346,8 @@
           <div class="muted">{{ d.deviceKey }}</div>
         </button>
         <div v-if="!kdzsDevices.length" class="muted pad">
-          暂无绑定设备，请先
-          <button type="button" class="link-inline" @click="router.push('/kdzs-print')">去绑定 Agent</button>
+          暂无在线打单机，请先启动 WindowsAgent（连 Agents）
+          <button type="button" class="link-inline" @click="router.push('/kdzs-print')">查看机器</button>
         </div>
       </div>
     </van-popup>
