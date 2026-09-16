@@ -12,8 +12,20 @@
           {{ syncLabel }}
         </button>
       </div>
+      <div class="sync-bar">
+        <span>已发货退款成功</span>
+        <button type="button" class="status-chip" @click="showShippedRange = true">
+          {{ shippedRangeLabel }}
+        </button>
+      </div>
+      <div class="sync-bar">
+        <span>退货退款成功</span>
+        <button type="button" class="status-chip" @click="showReturnRange = true">
+          {{ returnRangeLabel }}
+        </button>
+      </div>
       <p class="list-hint">
-        从 Agents 已上线店铺创建采集；「立即执行」下发到 WindowsAgent。
+        两块申请时间可分开设。首次可把某一块设成「全部」回填，日常用近 7 / 30 天。
       </p>
       <van-list :loading="loading" :finished="true" finished-text="">
         <div v-for="row in list" :key="row.id" class="order-card" @click="openActions(row)">
@@ -53,6 +65,20 @@
       cancel-text="取消"
       close-on-click-action
       @select="onSaveSync"
+    />
+    <van-action-sheet
+      v-model:show="showShippedRange"
+      :actions="rangeActions"
+      cancel-text="取消"
+      close-on-click-action
+      @select="onSaveShippedRange"
+    />
+    <van-action-sheet
+      v-model:show="showReturnRange"
+      :actions="rangeActions"
+      cancel-text="取消"
+      close-on-click-action
+      @select="onSaveReturnRange"
     />
 
     <van-popup v-model:show="showForm" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
@@ -125,6 +151,7 @@ import {
   PLATFORM_OPTIONS,
   PLUGIN_STATUS_MAP,
   PLUGIN_SYNC_OPTIONS,
+  REFUND_APPLY_RANGE_OPTIONS,
   aftersalesApi,
   type AgentOnlineShop,
   type MarketplaceShop,
@@ -140,11 +167,15 @@ const saving = ref(false)
 const showForm = ref(false)
 const showActions = ref(false)
 const showSync = ref(false)
+const showShippedRange = ref(false)
+const showReturnRange = ref(false)
 const showPlatform = ref(false)
 const showOnline = ref(false)
 const showInterval = ref(false)
 const current = ref<MarketplaceShop | null>(null)
 const syncMinutes = ref(30)
+const shippedRefundApplyRange = ref('30')
+const returnRefundApplyRange = ref('30')
 const form = reactive({
   id: 0,
   name: '',
@@ -161,7 +192,14 @@ const form = reactive({
 const syncLabel = computed(
   () => PLUGIN_SYNC_OPTIONS.find((o) => o.value === syncMinutes.value)?.label || '每 30 分钟',
 )
+const shippedRangeLabel = computed(
+  () => REFUND_APPLY_RANGE_OPTIONS.find((o) => o.value === shippedRefundApplyRange.value)?.label || '近 30 天',
+)
+const returnRangeLabel = computed(
+  () => REFUND_APPLY_RANGE_OPTIONS.find((o) => o.value === returnRefundApplyRange.value)?.label || '近 30 天',
+)
 const syncActions = PLUGIN_SYNC_OPTIONS.map((o) => ({ name: o.label, value: o.value }))
+const rangeActions = REFUND_APPLY_RANGE_OPTIONS.map((o) => ({ name: o.label, value: o.value }))
 const platformActions = PLATFORM_OPTIONS.map((o) => ({ name: o.label, value: o.value }))
 const onlineActions = computed(() =>
   onlineShops.value.map((s) => ({
@@ -196,6 +234,8 @@ async function loadData() {
     ])
     list.value = shops || []
     syncMinutes.value = setting.pluginSyncIntervalMin || 30
+    shippedRefundApplyRange.value = setting.shippedRefundApplyRange || setting.refundApplyRange || '30'
+    returnRefundApplyRange.value = setting.returnRefundApplyRange || setting.refundApplyRange || '30'
   } catch (e: any) {
     showFailToast(e.message || '加载失败')
   } finally {
@@ -310,12 +350,46 @@ async function saveShop() {
   }
 }
 
+async function persistPluginSetting(partial: {
+  pluginSyncIntervalMin?: number
+  shippedRefundApplyRange?: string
+  returnRefundApplyRange?: string
+}) {
+  const setting = await aftersalesApi.savePluginSetting({
+    pluginSyncIntervalMin: partial.pluginSyncIntervalMin ?? syncMinutes.value,
+    shippedRefundApplyRange: partial.shippedRefundApplyRange ?? shippedRefundApplyRange.value,
+    returnRefundApplyRange: partial.returnRefundApplyRange ?? returnRefundApplyRange.value,
+  })
+  syncMinutes.value = setting.pluginSyncIntervalMin
+  shippedRefundApplyRange.value = setting.shippedRefundApplyRange || '30'
+  returnRefundApplyRange.value = setting.returnRefundApplyRange || '30'
+}
+
 async function onSaveSync(act: { value?: number }) {
   if (!act.value) return
   try {
-    const setting = await aftersalesApi.savePluginSetting({ pluginSyncIntervalMin: act.value })
-    syncMinutes.value = setting.pluginSyncIntervalMin
-    showSuccessToast('已保存，并更新各店采集间隔')
+    await persistPluginSetting({ pluginSyncIntervalMin: act.value })
+    showSuccessToast('已保存采集间隔')
+  } catch (e: any) {
+    showFailToast(e.message || '保存失败')
+  }
+}
+
+async function onSaveShippedRange(act: { value?: string }) {
+  if (!act.value) return
+  try {
+    await persistPluginSetting({ shippedRefundApplyRange: act.value })
+    showSuccessToast('已保存已发货退款成功范围')
+  } catch (e: any) {
+    showFailToast(e.message || '保存失败')
+  }
+}
+
+async function onSaveReturnRange(act: { value?: string }) {
+  if (!act.value) return
+  try {
+    await persistPluginSetting({ returnRefundApplyRange: act.value })
+    showSuccessToast('已保存退货退款成功范围')
   } catch (e: any) {
     showFailToast(e.message || '保存失败')
   }
