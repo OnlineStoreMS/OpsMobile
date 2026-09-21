@@ -337,6 +337,50 @@ const router = createRouter({
       meta: { title: '服务工单', hideTabbar: true },
     },
 
+    // —— 客服中心子页 ——
+    {
+      path: '/customer-service/shops',
+      name: 'CsShops',
+      component: () => import('../views/cs/ShopList.vue'),
+      meta: { title: '店铺管理', hideTabbar: true },
+    },
+    {
+      path: '/customer-service/shops/new',
+      name: 'CsShopNew',
+      component: () => import('../views/cs/ShopForm.vue'),
+      meta: { title: '添加店铺', hideTabbar: true },
+    },
+    {
+      path: '/customer-service/shops/:id/edit',
+      name: 'CsShopEdit',
+      component: () => import('../views/cs/ShopForm.vue'),
+      meta: { title: '编辑店铺', hideTabbar: true },
+    },
+    {
+      path: '/customer-service/auto-reply',
+      name: 'CsAutoReply',
+      component: () => import('../views/cs/AutoReplyList.vue'),
+      meta: { title: '自动回复', hideTabbar: true },
+    },
+    {
+      path: '/customer-service/auto-reply/new',
+      name: 'CsAutoReplyNew',
+      component: () => import('../views/cs/AutoReplyForm.vue'),
+      meta: { title: '新建规则', hideTabbar: true },
+    },
+    {
+      path: '/customer-service/auto-reply/:id',
+      name: 'CsAutoReplyEdit',
+      component: () => import('../views/cs/AutoReplyForm.vue'),
+      meta: { title: '编辑规则', hideTabbar: true },
+    },
+    {
+      path: '/customer-service/llm',
+      name: 'CsLlmSettings',
+      component: () => import('../views/cs/LlmSettings.vue'),
+      meta: { title: 'DeepSeek 设置', hideTabbar: true },
+    },
+
     // —— 电商店铺同步子页 ——
     {
       path: '/storesync/products',

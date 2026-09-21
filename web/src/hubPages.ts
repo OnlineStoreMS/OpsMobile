@@ -8,6 +8,7 @@ import TodoHome from './views/todo/TodoHome.vue'
 import StoreSyncHome from './views/storesync/StoreSyncHome.vue'
 import StoreHome from './views/store/StoreHome.vue'
 import AfterSalesHome from './views/aftersales/AfterSalesHome.vue'
+import CsHome from './views/cs/CsHome.vue'
 
 /**
  * OpsMobile 顶层大页（安卓 ViewPager）。
@@ -52,6 +53,13 @@ export const hubPages: HubPageDef[] = [
     title: '售后中心',
     short: '售后',
     component: AfterSalesHome,
+  },
+  {
+    path: '/customer-service',
+    name: 'CsHome',
+    title: '客服中心',
+    short: '客服',
+    component: CsHome,
   },
   {
     path: '/supply',
