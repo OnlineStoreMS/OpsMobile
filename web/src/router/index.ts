@@ -263,6 +263,18 @@ const router = createRouter({
       meta: { title: '全部待办', hideTabbar: true },
     },
     {
+      path: '/todo/todos/new',
+      name: 'TodoCreate',
+      component: () => import('../views/todo/TodoForm.vue'),
+      meta: { title: '新建待办', hideTabbar: true },
+    },
+    {
+      path: '/todo/todos/:id/edit',
+      name: 'TodoEdit',
+      component: () => import('../views/todo/TodoForm.vue'),
+      meta: { title: '编辑待办', hideTabbar: true },
+    },
+    {
       path: '/todo/todos/:id',
       name: 'TodoDetail',
       component: () => import('../views/todo/TodoDetail.vue'),

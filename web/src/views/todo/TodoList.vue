@@ -1,6 +1,10 @@
 <template>
   <div class="page">
-    <van-nav-bar class="ops-nav" :title="navTitle" left-arrow @click-left="router.back()" />
+    <van-nav-bar class="ops-nav" :title="navTitle" left-arrow @click-left="router.back()">
+      <template #right>
+        <span class="nav-link" @click="router.push('/todo/todos/new')">新建</span>
+      </template>
+    </van-nav-bar>
     <div class="list-shell">
       <van-search v-model="keyword" shape="round" placeholder="标题 / 描述" show-action @search="reload">
         <template #action>
@@ -24,6 +28,15 @@
             <template v-if="row.isMonthlyInstance || row.recurrence === 'monthly'"> · 月待办</template>
           </div>
           <div class="muted" v-if="row.dueAt">截止 {{ formatTime(row.dueAt) }}</div>
+          <div v-if="row.images?.length" class="thumbs">
+            <img
+              v-for="(img, i) in row.images.slice(0, 3)"
+              :key="img.url + i"
+              :src="img.url"
+              class="thumb"
+              alt=""
+            />
+          </div>
         </div>
         <van-empty v-if="!loading && !list.length" description="暂无待办" />
       </van-list>
@@ -121,5 +134,17 @@ watch(
 .order-card__no {
   flex: 1;
   min-width: 0;
+}
+.thumbs {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #f3f4f6;
 }
 </style>

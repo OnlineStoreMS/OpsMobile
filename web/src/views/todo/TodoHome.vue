@@ -49,6 +49,14 @@ const sections = [
     title: '待办',
     items: [
       {
+        path: '/todo/todos/new',
+        title: '新建待办',
+        desc: '标题 · 图片笔记',
+        icon: 'plus',
+        gradient: 'linear-gradient(145deg, #9f1239, #e11d48)',
+        glow: 'rgba(225, 29, 72, 0.28)',
+      },
+      {
         path: '/todo/todos',
         title: '全部待办',
         desc: '列表 · 搜索',

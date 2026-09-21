@@ -1,6 +1,10 @@
 <template>
   <div class="page">
-    <van-nav-bar class="ops-nav" title="待办详情" left-arrow @click-left="router.back()" />
+    <van-nav-bar class="ops-nav" title="待办详情" left-arrow @click-left="router.back()">
+      <template #right>
+        <span v-if="detail" class="nav-link" @click="router.push(`/todo/todos/${detail.id}/edit`)">编辑</span>
+      </template>
+    </van-nav-bar>
     <div class="page-body" v-if="detail">
       <div class="card">
         <div class="order-card__no">{{ detail.title }}</div>
@@ -13,16 +17,12 @@
         <div class="desc" v-if="detail.description">{{ detail.description }}</div>
       </div>
 
-      <div class="section-label" v-if="(detail.images || []).length">附件</div>
+      <div class="section-label" v-if="(detail.images || []).length">图片笔记</div>
       <div class="img-row" v-if="(detail.images || []).length">
-        <img
-          v-for="(img, i) in detail.images"
-          :key="i"
-          :src="img.url"
-          class="img-thumb"
-          alt=""
-          @click="preview(i)"
-        />
+        <template v-for="(img, i) in detail.images" :key="i">
+          <a v-if="img.mediaType === 'video'" class="img-thumb video" :href="img.url" target="_blank">视频</a>
+          <img v-else :src="img.url" class="img-thumb" alt="" @click="preview(i)" />
+        </template>
       </div>
 
       <div class="footer-safe" v-if="canAct">
@@ -74,9 +74,14 @@ function formatTime(v?: string) {
 }
 
 function preview(start: number) {
-  const urls = (detail.value?.images || []).map((x: any) => x.url).filter(Boolean)
+  const urls = (detail.value?.images || [])
+    .filter((x: any) => x.mediaType !== 'video')
+    .map((x: any) => x.url)
+    .filter(Boolean)
   if (!urls.length) return
-  showImagePreview({ images: urls, startPosition: start })
+  const clicked = detail.value?.images?.[start]?.url
+  const idx = Math.max(0, urls.indexOf(clicked))
+  showImagePreview({ images: urls, startPosition: idx })
 }
 
 async function setStatus(status: string) {
@@ -136,6 +141,16 @@ onMounted(async () => {
   height: 72px;
   object-fit: cover;
   border-radius: 10px;
+  background: #f3f4f6;
+}
+.img-thumb.video {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #be123c;
+  text-decoration: none;
 }
 .footer-safe {
   display: grid;
