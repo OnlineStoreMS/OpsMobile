@@ -60,6 +60,7 @@ export type AsCardRow = {
   applyTime?: string
   timeoutText?: string
   timeoutAction?: string
+  timeoutDisplay?: string
   deadlineAt?: string
   remainSeconds?: number
   dispute?: string
@@ -76,6 +77,9 @@ export type AsCardRow = {
   returnLocation?: string
   returnTime?: string
   tracks?: LogisticsTrack[]
+  signedTime?: string
+  pickupPoint?: string
+  fenFaRemark?: string
 }
 
 export interface AftersaleTicket {
@@ -96,6 +100,7 @@ export interface AftersaleTicket {
   status: string
   timeoutText?: string
   timeoutAction?: string
+  timeoutDisplay?: string
   deadlineAt?: string
   remainSeconds?: number
   dispute?: string
@@ -106,6 +111,8 @@ export interface AftersaleTicket {
   returnLogisticsNo?: string
   shipLogisticsNo?: string
   tracks?: LogisticsTrack[]
+  signedTime?: string
+  pickupPoint?: string
   shopId?: number
   shopName?: string
   applyTime?: string
@@ -148,6 +155,7 @@ export interface ReturnPackage {
   shipTime?: string
   applyTime?: string
   returnTime?: string
+  fenFaRemark?: string
   tracks?: LogisticsTrack[]
   syncedAt: string
 }
@@ -180,6 +188,7 @@ export interface ShippedRefund {
   tracks?: LogisticsTrack[]
   alert?: boolean
   applyTime?: string
+  signedTime?: string
   syncedAt: string
 }
 
@@ -202,6 +211,11 @@ export interface InterceptOrder {
   aftersaleType: string
   reason: string
   status: string
+  timeoutText?: string
+  timeoutAction?: string
+  timeoutDisplay?: string
+  deadlineAt?: string
+  remainSeconds?: number
   logistics?: string
   logisticsStatus?: string
   logisticsNo?: string
@@ -303,15 +317,64 @@ export const REFUND_APPLY_RANGE_OPTIONS: { value: string; label: string }[] = [
   { value: '7', label: '近 7 天' },
   { value: '30', label: '近 30 天' },
   { value: '90', label: '近 90 天' },
+  { value: 'custom', label: '自定义' },
 ]
+
+const CUSTOM_RANGE_RE = /(\d{4})[-/](\d{1,2})[-/](\d{1,2}).*?(\d{4})[-/](\d{1,2})[-/](\d{1,2})/
+
+function padDate(n: string | number) {
+  return String(n).padStart(2, '0')
+}
+
+export function toRefundApplyYmd(raw: unknown): string {
+  if (raw == null || raw === '') return ''
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) {
+    return `${raw.getFullYear()}-${padDate(raw.getMonth() + 1)}-${padDate(raw.getDate())}`
+  }
+  const s = String(raw).trim()
+  const m = s.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+  if (m) return `${m[1]}-${padDate(m[2])}-${padDate(m[3])}`
+  const t = Date.parse(s)
+  if (!Number.isNaN(t)) {
+    const d = new Date(t)
+    return `${d.getFullYear()}-${padDate(d.getMonth() + 1)}-${padDate(d.getDate())}`
+  }
+  return ''
+}
+
+export function encodeRefundApplyRange(mode: string, custom?: [unknown, unknown] | unknown[] | null) {
+  if (mode !== 'custom') return mode || '30'
+  const from = toRefundApplyYmd(custom?.[0])
+  const to = toRefundApplyYmd(custom?.[1])
+  if (!from || !to) return ''
+  return from <= to ? `${from},${to}` : `${to},${from}`
+}
+
+export function splitRefundApplyRange(raw?: string): { mode: string; custom: [string, string] | null } {
+  const value = String(raw || '').trim()
+  const m = value.match(CUSTOM_RANGE_RE)
+  if (m) {
+    const from = `${m[1]}-${padDate(m[2])}-${padDate(m[3])}`
+    const to = `${m[4]}-${padDate(m[5])}-${padDate(m[6])}`
+    return { mode: 'custom', custom: from <= to ? [from, to] : [to, from] }
+  }
+  if (value && value !== 'custom') return { mode: value, custom: null }
+  return { mode: '30', custom: null }
+}
+
+export function refundApplyRangeLabel(raw?: string) {
+  const split = splitRefundApplyRange(raw)
+  if (split.mode === 'custom' && split.custom) return `${split.custom[0]} 至 ${split.custom[1]}`
+  return REFUND_APPLY_RANGE_OPTIONS.find((o) => o.value === split.mode)?.label || '近 30 天'
+}
 
 export const LOGISTICS_STATUS_OPTIONS = ['待取件', '已签收', '运输中', '已发货', '已取消']
 
 export const SERVICE_TABS = ['待处理', '处理中', '已逾期'] as const
 
 export const TICKET_KIND_META: Record<ShopTicketKind, { title: string; placeholder: string }> = {
-  'buyer-return-pickup': { title: '待取件', placeholder: '售后编号 / 订单号 / 商品 / 退货单号' },
-  'review-shipped-refund': { title: '已发货退款', placeholder: '售后编号 / 订单号 / 商品 / 物流' },
+  'buyer-return-pickup': { title: '待取件', placeholder: '售后编号 / 订单号 / 商品 / 退货单号 / 代收点' },
+  'review-shipped-refund': { title: '已发货退款', placeholder: '售后编号 / 订单号 / 商品 / 物流 / 申请原因' },
   'buyer-return-signed': { title: '退货已签收', placeholder: '售后编号 / 订单号 / 商品 / 退货单号' },
 }
 
@@ -353,13 +416,16 @@ export const aftersalesApi = {
     kind: ShopTicketKind
     shopId?: number
     keyword?: string
+    reason?: string
     page?: number
     pageSize?: number
-  }) => unwrap<PageData<AftersaleTicket>>(await aftersalesClient.get('/shop-tickets', { params })),
+  }) => unwrap<PageData<AftersaleTicket> & { reasons?: string[] }>(await aftersalesClient.get('/shop-tickets', { params })),
   fetchReturnPackages: async (params?: Record<string, unknown>) =>
     unwrap<PageData<ReturnPackage>>(await aftersalesClient.get('/return-packages', { params })),
+  fetchShippedRefundReasons: async (shopId?: number) =>
+    unwrap<string[]>(await aftersalesClient.get('/shipped-refunds/reasons', { params: { shopId: shopId || undefined } })),
   fetchShippedRefunds: async (params?: Record<string, unknown>) =>
-    unwrap<PageData<ShippedRefund>>(await aftersalesClient.get('/shipped-refunds', { params })),
+    unwrap<PageData<ShippedRefund> & { reasons?: string[] }>(await aftersalesClient.get('/shipped-refunds', { params })),
   fetchReturnRefunds: async (params?: Record<string, unknown>) =>
     unwrap<PageData<ShippedRefund>>(await aftersalesClient.get('/return-refunds', { params })),
   fetchInterceptOrders: async (params?: Record<string, unknown>) =>

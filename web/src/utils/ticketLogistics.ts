@@ -103,3 +103,41 @@ export function badgeText(n?: number) {
 export function trackDetail(track: { detail?: string; title?: string; date?: string; text?: string }) {
   return track.detail || (track.title || track.date ? '' : track.text || '')
 }
+
+const TRACK_TIME_RE = /((?:\d{4}[-/])?\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?)/
+
+function trackLooksSigned(track: { date?: string; title?: string; detail?: string; text?: string }) {
+  return [track.title, track.text, track.detail].some((s) => String(s || '').includes('已签收'))
+}
+
+function trackTimeOf(track: { date?: string; title?: string; detail?: string; text?: string }) {
+  const date = String(track.date || '').trim()
+  if (date) return date
+  const blob = [track.text, track.detail, track.title].filter(Boolean).join(' ')
+  return blob.match(TRACK_TIME_RE)?.[1] || ''
+}
+
+export function signedTimeFromTracks(
+  tracks?: Array<{ date?: string; title?: string; detail?: string; text?: string }> | null,
+  fallback = '',
+) {
+  const direct = String(fallback || '').trim()
+  if (direct) return direct
+  for (const track of tracks || []) {
+    if (!trackLooksSigned(track)) continue
+    const time = trackTimeOf(track)
+    if (time) return time
+  }
+  return ''
+}
+
+export function pickupPointOf(row: {
+  pickupPoint?: string
+  tracks?: Array<{ date?: string; title?: string; detail?: string; text?: string }> | null
+}) {
+  const direct = String(row.pickupPoint || '').trim()
+  if (direct) return direct
+  const track = row.tracks?.[0]
+  if (!track) return ''
+  return [track.date, track.title, trackDetail(track)].filter(Boolean).join(' ').trim() || String(track.text || '').trim()
+}

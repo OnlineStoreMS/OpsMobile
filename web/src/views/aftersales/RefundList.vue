@@ -28,6 +28,26 @@
           {{ s }}
         </button>
       </div>
+      <div v-if="showReason" class="status-bar">
+        <button
+          type="button"
+          class="status-chip"
+          :class="{ 'status-chip--on': !reason }"
+          @click="setReason('')"
+        >
+          全部原因
+        </button>
+        <button
+          v-for="item in reasons"
+          :key="item"
+          type="button"
+          class="status-chip"
+          :class="{ 'status-chip--on': reason === item }"
+          @click="setReason(item)"
+        >
+          {{ item }}
+        </button>
+      </div>
       <div class="status-bar">
         <button
           type="button"
@@ -85,6 +105,8 @@ const route = useRoute()
 const keyword = ref('')
 const shopId = ref<number | undefined>()
 const status = ref('')
+const reason = ref('')
+const reasons = ref<string[]>([])
 const datePreset = ref<'all' | '30d'>('all')
 const shops = ref<MarketplaceShop[]>([])
 const shopCounts = ref<Record<number, number>>({})
@@ -101,10 +123,24 @@ const pageTitle = computed(() => {
   if (mode.value === 'returns') return '退回件'
   return '已发货退款成功'
 })
-const placeholder = computed(() =>
-  mode.value === 'returns' ? '订单号 / 售后编号 / 物流单号 / 退回地' : '订单号 / 售后编号 / 商品 / 物流',
-)
+const placeholder = computed(() => {
+  if (mode.value === 'returns') return '订单号 / 售后编号 / 物流单号 / 退回地'
+  if (mode.value === 'shipped') return '订单号 / 售后编号 / 商品 / 物流 / 申请原因'
+  return '订单号 / 售后编号 / 商品 / 物流'
+})
 const showStatus = computed(() => mode.value === 'shipped' || mode.value === 'return-refund')
+const showReason = computed(() => mode.value === 'shipped')
+
+function mergeReasons(rows: Row[], extra?: string[]) {
+  const set = new Set(reasons.value)
+  for (const item of extra || []) {
+    if (item) set.add(item)
+  }
+  for (const row of rows) {
+    if (row.reason) set.add(row.reason)
+  }
+  reasons.value = [...set].sort((a, b) => a.localeCompare(b, 'zh'))
+}
 
 function applyRange() {
   if (datePreset.value !== '30d') return {}
@@ -131,6 +167,12 @@ function setDate(v: 'all' | '30d') {
   reload()
 }
 
+function setReason(v: string) {
+  reason.value = v
+  void loadCounts()
+  reload()
+}
+
 async function fetchTotal(id?: number) {
   const params = {
     shopId: id,
@@ -147,7 +189,13 @@ async function fetchTotal(id?: number) {
   if (mode.value === 'return-refund') {
     return (await aftersalesApi.fetchReturnRefunds({ ...params, status: status.value || undefined })).total || 0
   }
-  return (await aftersalesApi.fetchShippedRefunds({ ...params, status: status.value || undefined })).total || 0
+  return (
+    await aftersalesApi.fetchShippedRefunds({
+      ...params,
+      status: status.value || undefined,
+      reason: reason.value || undefined,
+    })
+  ).total || 0
 }
 
 async function loadCounts() {
@@ -187,7 +235,11 @@ async function fetchPage() {
   if (mode.value === 'return-refund') {
     return aftersalesApi.fetchReturnRefunds({ ...params, status: status.value || undefined })
   }
-  return aftersalesApi.fetchShippedRefunds({ ...params, status: status.value || undefined })
+  return aftersalesApi.fetchShippedRefunds({
+    ...params,
+    status: status.value || undefined,
+    reason: reason.value || undefined,
+  })
 }
 
 function asRows(rows: Array<ShippedRefund | ReturnPackage | InterceptOrder>): Row[] {
@@ -199,6 +251,10 @@ async function loadMore() {
   try {
     const res = await fetchPage()
     const rows = asRows(res.list || [])
+    if (showReason.value) {
+      const extra = 'reasons' in res && Array.isArray(res.reasons) ? res.reasons : undefined
+      mergeReasons(rows, extra)
+    }
     list.value = page.value === 1 ? rows : list.value.concat(rows)
     if (rows.length < 20) finished.value = true
     else page.value += 1

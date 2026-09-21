@@ -29,8 +29,11 @@
         <template v-if="row.reason"> · {{ row.reason }}</template>
       </div>
       <div v-if="row.applyTime">申请 {{ formatTime(row.applyTime) }}</div>
+      <div v-if="pickupPoint">代收点 {{ pickupPoint }}</div>
+      <div v-if="signedTime">签收 {{ formatTime(signedTime) }}</div>
       <div v-if="row.returnLocation">退回地 {{ row.returnLocation }}</div>
       <div v-if="row.returnTime">退回 {{ formatTime(row.returnTime) }}</div>
+      <div v-if="row.fenFaRemark">分发备注 {{ row.fenFaRemark }}</div>
       <div v-if="row.tags" class="muted">{{ row.tags }}</div>
       <div v-if="row.dispute" class="tone-warning">纠纷 {{ row.dispute }}</div>
       <div v-if="timeoutLabel" :class="timeoutClass">{{ timeoutLabel }}</div>
@@ -82,14 +85,17 @@ import {
   formatRemain,
   formatTime,
   parseTicketLogistics,
+  pickupPointOf,
   remainSecondsOf,
   remainTone,
+  signedTimeFromTracks,
   trackDetail,
 } from '../../utils/ticketLogistics'
 
 const props = defineProps<{
   row: AsCardRow
   now?: number
+  showPickup?: boolean
   extraTags?: Array<{ label: string; type: 'danger' | 'warning' | 'primary' | 'success' }>
 }>()
 
@@ -97,6 +103,8 @@ const open = ref(false)
 const extraTags = computed(() => props.extraTags || [])
 const tracks = computed(() => (props.row.tracks || []).slice(0, 5))
 const logi = computed(() => parseTicketLogistics(props.row))
+const pickupPoint = computed(() => (props.showPickup ? pickupPointOf(props.row) : ''))
+const signedTime = computed(() => signedTimeFromTracks(props.row.tracks, props.row.signedTime))
 
 const remain = computed(() => remainSecondsOf(props.row, props.now || Date.now()))
 const timeoutClass = computed(() => {
@@ -105,12 +113,16 @@ const timeoutClass = computed(() => {
 })
 const timeoutLabel = computed(() => {
   const row = props.row
-  if (!row.deadlineAt && !row.timeoutText && !row.remainSeconds) return ''
+  if (!row.deadlineAt && !row.timeoutText && !row.timeoutDisplay && !row.remainSeconds) return ''
   if (row.deadlineAt || row.remainSeconds) {
-    if (remain.value <= 0) return row.timeoutAction ? `已超时 · ${row.timeoutAction}` : '已超时'
+    if (remain.value <= 0) {
+      return row.timeoutAction
+        ? `已超时 · ${row.timeoutAction}`
+        : row.timeoutText || row.timeoutDisplay || '已超时'
+    }
     return `剩余 ${formatRemain(remain.value)}${row.timeoutAction ? `后${row.timeoutAction}` : ''}`
   }
-  return row.timeoutText || ''
+  return row.timeoutDisplay || row.timeoutText || ''
 })
 
 const statusTagType = computed(() => {

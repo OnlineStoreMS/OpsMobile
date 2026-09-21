@@ -8,8 +8,34 @@
         </template>
       </van-search>
       <ShopChips v-model="shopId" :shops="shops" :counts="shopCounts" :all-count="allShopCount" @update:modelValue="reload" />
+      <div v-if="showReason" class="status-bar">
+        <button
+          type="button"
+          class="status-chip"
+          :class="{ 'status-chip--on': !reason }"
+          @click="setReason('')"
+        >
+          全部原因
+        </button>
+        <button
+          v-for="item in reasons"
+          :key="item"
+          type="button"
+          class="status-chip"
+          :class="{ 'status-chip--on': reason === item }"
+          @click="setReason(item)"
+        >
+          {{ item }}
+        </button>
+      </div>
       <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
-        <AsTicketCard v-for="row in list" :key="row.id" :row="row" :now="nowTick" />
+        <AsTicketCard
+          v-for="row in list"
+          :key="row.id"
+          :row="row"
+          :now="nowTick"
+          :show-pickup="showPickup"
+        />
         <van-empty v-if="!loading && !list.length" description="暂无售后单" />
       </van-list>
     </div>
@@ -35,6 +61,8 @@ const router = useRouter()
 const route = useRoute()
 const keyword = ref('')
 const shopId = ref<number | undefined>()
+const reason = ref('')
+const reasons = ref<string[]>([])
 const shops = ref<MarketplaceShop[]>([])
 const shopCounts = ref<Record<number, number>>({})
 const allShopCount = ref(0)
@@ -51,6 +79,24 @@ const kind = computed<ShopTicketKind>(() => {
   return 'buyer-return-pickup'
 })
 const meta = computed(() => TICKET_KIND_META[kind.value])
+const showPickup = computed(() => kind.value === 'buyer-return-pickup')
+const showReason = computed(() => kind.value === 'review-shipped-refund')
+
+function mergeReasons(rows: AftersaleTicket[], extra?: string[]) {
+  const set = new Set(reasons.value)
+  for (const item of extra || []) {
+    if (item) set.add(item)
+  }
+  for (const row of rows) {
+    if (row.reason) set.add(row.reason)
+  }
+  reasons.value = [...set].sort((a, b) => a.localeCompare(b, 'zh'))
+}
+
+function setReason(v: string) {
+  reason.value = v
+  reload()
+}
 
 async function loadShops() {
   try {
@@ -79,10 +125,12 @@ async function loadMore() {
       kind: kind.value,
       shopId: shopId.value,
       keyword: keyword.value.trim() || undefined,
+      reason: showReason.value ? reason.value || undefined : undefined,
       page: page.value,
       pageSize: 20,
     })
     const rows = res.list || []
+    mergeReasons(rows, res.reasons)
     list.value = page.value === 1 ? rows : list.value.concat(rows)
     if (rows.length < 20) finished.value = true
     else page.value += 1
@@ -106,6 +154,8 @@ watch(
   () => {
     keyword.value = ''
     shopId.value = undefined
+    reason.value = ''
+    reasons.value = []
     void loadCounts()
     reload()
   },

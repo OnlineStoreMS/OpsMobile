@@ -67,7 +67,7 @@ const sections = computed(() => [
       {
         path: '/aftersales/tickets?kind=buyer-return-pickup',
         title: '待取件',
-        desc: '买家退货待取件',
+        desc: '买家退货待取件 · 代收点',
         count: badgeText(counts.value?.buyerReturnPickup),
         icon: 'logistics',
         gradient: 'linear-gradient(145deg, #c2410c, #f59e0b)',
@@ -76,7 +76,7 @@ const sections = computed(() => [
       {
         path: '/aftersales/tickets?kind=review-shipped-refund',
         title: '已发货退款',
-        desc: '待商家审核',
+        desc: '待商家审核 · 申请原因',
         count: badgeText(counts.value?.reviewShippedRefund),
         icon: 'balance-pay',
         gradient: 'linear-gradient(145deg, #0369a1, #0ea5e9)',
@@ -90,7 +90,7 @@ const sections = computed(() => [
       {
         path: '/aftersales/intercept',
         title: '需商家拦截快递',
-        desc: '拦截 + 发货待取件',
+        desc: '拦截 + 发货待取件 · 时效',
         count: badgeText(counts.value?.interceptOrders),
         icon: 'warning-o',
         gradient: 'linear-gradient(145deg, #9f1239, #e11d48)',
@@ -99,7 +99,7 @@ const sections = computed(() => [
       {
         path: '/aftersales/tickets?kind=buyer-return-signed',
         title: '退货已签收',
-        desc: '待商家收货',
+        desc: '待商家收货 · 签收时间',
         count: badgeText(counts.value?.buyerReturnSigned),
         icon: 'passed',
         gradient: 'linear-gradient(145deg, #b45309, #f59e0b)',
@@ -108,7 +108,7 @@ const sections = computed(() => [
       {
         path: '/aftersales/shipped-success',
         title: '已发货退款成功',
-        desc: '退款成功 · 物流跟踪',
+        desc: '退款成功 · 申请原因',
         icon: 'completed',
         gradient: 'linear-gradient(145deg, #047857, #10b981)',
         glow: 'rgba(16, 185, 129, 0.26)',
@@ -124,7 +124,7 @@ const sections = computed(() => [
       {
         path: '/aftersales/returns',
         title: '退回件',
-        desc: '已退回包裹',
+        desc: '已退回包裹 · 分发备注',
         icon: 'back-top',
         gradient: 'linear-gradient(145deg, #0f766e, #14b8a6)',
         glow: 'rgba(20, 184, 166, 0.28)',

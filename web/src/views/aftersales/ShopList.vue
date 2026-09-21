@@ -25,7 +25,7 @@
         </button>
       </div>
       <p class="list-hint">
-        两块申请时间可分开设。首次可把某一块设成「全部」回填，日常用近 7 / 30 天。
+        两块申请时间可分开设，也支持自定义日期。首次可把某一块设成「全部」回填，日常用近 7 / 30 天。
       </p>
       <van-list :loading="loading" :finished="true" finished-text="">
         <div v-for="row in list" :key="row.id" class="order-card" @click="openActions(row)">
@@ -140,6 +140,21 @@
       close-on-click-action
       @select="onPickInterval"
     />
+    <van-calendar
+      v-if="showRangeCal"
+      :key="rangeCalKey"
+      :show="showRangeCal"
+      type="range"
+      :min-date="rangeMinDate"
+      :max-date="rangeMaxDate"
+      :default-date="rangeCalDefault"
+      allow-same-day
+      show-confirm
+      confirm-text="确定"
+      teleport="body"
+      @update:show="onRangeCalShow"
+      @confirm="onRangeCalConfirm"
+    />
   </div>
 </template>
 
@@ -153,10 +168,14 @@ import {
   PLUGIN_SYNC_OPTIONS,
   REFUND_APPLY_RANGE_OPTIONS,
   aftersalesApi,
+  encodeRefundApplyRange,
+  refundApplyRangeLabel,
+  splitRefundApplyRange,
   type AgentOnlineShop,
   type MarketplaceShop,
   type ShopPlatform,
 } from '../../api/aftersales'
+import { daysAgo, parseDay, todayDay } from '../../utils/dateRange'
 import { formatTime } from '../../utils/ticketLogistics'
 
 const router = useRouter()
@@ -172,6 +191,15 @@ const showReturnRange = ref(false)
 const showPlatform = ref(false)
 const showOnline = ref(false)
 const showInterval = ref(false)
+const showRangeCal = ref(false)
+const rangeCalKey = ref(0)
+const rangeCalTarget = ref<'shipped' | 'return'>('shipped')
+const rangeMinDate = new Date(new Date().getFullYear() - 2, 0, 1)
+const rangeMaxDate = computed(() => {
+  const d = new Date()
+  d.setHours(23, 59, 59, 999)
+  return d
+})
 const current = ref<MarketplaceShop | null>(null)
 const syncMinutes = ref(30)
 const shippedRefundApplyRange = ref('30')
@@ -192,12 +220,13 @@ const form = reactive({
 const syncLabel = computed(
   () => PLUGIN_SYNC_OPTIONS.find((o) => o.value === syncMinutes.value)?.label || '每 30 分钟',
 )
-const shippedRangeLabel = computed(
-  () => REFUND_APPLY_RANGE_OPTIONS.find((o) => o.value === shippedRefundApplyRange.value)?.label || '近 30 天',
-)
-const returnRangeLabel = computed(
-  () => REFUND_APPLY_RANGE_OPTIONS.find((o) => o.value === returnRefundApplyRange.value)?.label || '近 30 天',
-)
+const shippedRangeLabel = computed(() => refundApplyRangeLabel(shippedRefundApplyRange.value))
+const returnRangeLabel = computed(() => refundApplyRangeLabel(returnRefundApplyRange.value))
+const rangeCalDefault = computed(() => {
+  const raw = rangeCalTarget.value === 'shipped' ? shippedRefundApplyRange.value : returnRefundApplyRange.value
+  const split = splitRefundApplyRange(raw)
+  return [parseDay(split.custom?.[0] || daysAgo(29)), parseDay(split.custom?.[1] || todayDay())] as [Date, Date]
+})
 const syncActions = PLUGIN_SYNC_OPTIONS.map((o) => ({ name: o.label, value: o.value }))
 const rangeActions = REFUND_APPLY_RANGE_OPTIONS.map((o) => ({ name: o.label, value: o.value }))
 const platformActions = PLATFORM_OPTIONS.map((o) => ({ name: o.label, value: o.value }))
@@ -375,11 +404,34 @@ async function onSaveSync(act: { value?: number }) {
   }
 }
 
+function openRangeCal(target: 'shipped' | 'return') {
+  rangeCalTarget.value = target
+  rangeCalKey.value += 1
+  showRangeCal.value = true
+}
+
+function onRangeCalShow(v: boolean) {
+  showRangeCal.value = v
+}
+
+async function persistRange(target: 'shipped' | 'return', value: string) {
+  if (target === 'shipped') {
+    await persistPluginSetting({ shippedRefundApplyRange: value })
+    showSuccessToast('已保存已发货退款成功范围')
+    return
+  }
+  await persistPluginSetting({ returnRefundApplyRange: value })
+  showSuccessToast('已保存退货退款成功范围')
+}
+
 async function onSaveShippedRange(act: { value?: string }) {
   if (!act.value) return
+  if (act.value === 'custom') {
+    openRangeCal('shipped')
+    return
+  }
   try {
-    await persistPluginSetting({ shippedRefundApplyRange: act.value })
-    showSuccessToast('已保存已发货退款成功范围')
+    await persistRange('shipped', act.value)
   } catch (e: any) {
     showFailToast(e.message || '保存失败')
   }
@@ -387,9 +439,27 @@ async function onSaveShippedRange(act: { value?: string }) {
 
 async function onSaveReturnRange(act: { value?: string }) {
   if (!act.value) return
+  if (act.value === 'custom') {
+    openRangeCal('return')
+    return
+  }
   try {
-    await persistPluginSetting({ returnRefundApplyRange: act.value })
-    showSuccessToast('已保存退货退款成功范围')
+    await persistRange('return', act.value)
+  } catch (e: any) {
+    showFailToast(e.message || '保存失败')
+  }
+}
+
+async function onRangeCalConfirm(dates: Date | Date[]) {
+  const arr = Array.isArray(dates) ? dates : [dates, dates]
+  const encoded = encodeRefundApplyRange('custom', arr)
+  if (!encoded) {
+    showFailToast('请选择完整日期范围')
+    return
+  }
+  showRangeCal.value = false
+  try {
+    await persistRange(rangeCalTarget.value, encoded)
   } catch (e: any) {
     showFailToast(e.message || '保存失败')
   }
