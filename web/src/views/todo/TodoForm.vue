@@ -61,10 +61,12 @@
         />
         <van-field
           v-if="!isMonthlyForm || editingIsInstance"
-          v-model="dueLocal"
-          type="datetime-local"
+          :model-value="dueDisplay"
+          is-link
+          readonly
           label="截止时间"
           placeholder="可选"
+          @click="openDuePicker"
         />
       </div>
 
@@ -126,6 +128,27 @@
       teleport="body"
       @select="onPickPriority"
     />
+    <van-popup v-model:show="showDue" position="bottom" round teleport="body">
+      <van-date-picker
+        v-if="dueStep === 'date'"
+        :model-value="dueDateCols"
+        title="选择截止日期"
+        :min-date="dueMinDate"
+        :max-date="dueMaxDate"
+        @confirm="onDueDate"
+        @cancel="showDue = false"
+      />
+      <van-time-picker
+        v-else
+        :model-value="dueTimeCols"
+        title="选择截止时刻"
+        @confirm="onDueTime"
+        @cancel="showDue = false"
+      />
+      <div v-if="dueLocal" class="due-clear">
+        <van-button block round @click="clearDue">清除截止时间</van-button>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -150,6 +173,12 @@ const saving = ref(false)
 const categories = ref<TodoCategory[]>([])
 const mediaFiles = ref<UploaderFileListItem[]>([])
 const dueLocal = ref('')
+const showDue = ref(false)
+const dueStep = ref<'date' | 'time'>('date')
+const dueDateCols = ref<string[]>([])
+const dueTimeCols = ref<string[]>(['18', '00'])
+const dueMinDate = new Date(new Date().getFullYear() - 1, 0, 1)
+const dueMaxDate = new Date(new Date().getFullYear() + 2, 11, 31)
 const editingId = ref(0)
 const editingIsTemplate = ref(false)
 const editingIsInstance = ref(false)
@@ -190,9 +219,63 @@ const dayActions = Array.from({ length: 28 }, (_, i) => ({ name: `每月 ${i + 1
 const statusActions = TODO_STATUS_OPTIONS.map((o) => ({ name: o.label, value: o.value }))
 const priorityActions = TODO_PRIORITY_OPTIONS.map((o) => ({ name: o.label, value: o.value }))
 
+const dueDisplay = computed(() => {
+  const s = fromLocalInput(dueLocal.value)
+  return s ? s.slice(0, 16) : ''
+})
+
+function pad2(n: number | string) {
+  return String(n).padStart(2, '0')
+}
+
 function toLocalInput(raw?: string) {
   if (!raw) return ''
-  return String(raw).replace(' ', 'T').slice(0, 16)
+  const s = String(raw).trim()
+  const m = s.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T\s](\d{1,2}):(\d{2}))?/)
+  if (!m) return ''
+  const time = m[4] != null ? `${pad2(m[4])}:${pad2(m[5] || '00')}` : '18:00'
+  return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}T${time}`
+}
+
+function splitDue(raw: string) {
+  const v = toLocalInput(raw)
+  if (!v) {
+    const now = new Date()
+    return {
+      date: [String(now.getFullYear()), pad2(now.getMonth() + 1), pad2(now.getDate())],
+      time: ['18', '00'],
+    }
+  }
+  return {
+    date: [v.slice(0, 4), v.slice(5, 7), v.slice(8, 10)],
+    time: [v.slice(11, 13), v.slice(14, 16)],
+  }
+}
+
+function openDuePicker() {
+  const split = splitDue(dueLocal.value)
+  dueDateCols.value = split.date
+  dueTimeCols.value = split.time
+  dueStep.value = 'date'
+  showDue.value = true
+}
+
+function onDueDate(payload: { selectedValues?: string[] }) {
+  const vals = payload.selectedValues || dueDateCols.value
+  if (vals.length >= 3) dueDateCols.value = [vals[0], pad2(vals[1]), pad2(vals[2])]
+  dueStep.value = 'time'
+}
+
+function onDueTime(payload: { selectedValues?: string[] }) {
+  const vals = payload.selectedValues || dueTimeCols.value
+  if (vals.length >= 2) dueTimeCols.value = [pad2(vals[0]), pad2(vals[1])]
+  dueLocal.value = `${dueDateCols.value[0]}-${dueDateCols.value[1]}-${dueDateCols.value[2]}T${dueTimeCols.value[0]}:${dueTimeCols.value[1]}`
+  showDue.value = false
+}
+
+function clearDue() {
+  dueLocal.value = ''
+  showDue.value = false
 }
 
 function fromLocalInput(raw: string) {
@@ -342,5 +425,8 @@ onMounted(async () => {
 }
 .page-loading {
   padding-top: 48px;
+}
+.due-clear {
+  padding: 0 16px calc(12px + var(--ops-safe-bottom));
 }
 </style>
