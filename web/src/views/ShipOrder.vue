@@ -166,9 +166,9 @@
           <button type="button" class="pick-row" @click="showKdzsTemplate = true">
             <div class="pick-row__badge carrier">模</div>
             <div class="pick-row__body">
-              <div class="pick-row__label">快递模板</div>
+              <div class="pick-row__label">{{ kdzsTemplateGroup }}模板</div>
               <div v-if="kdzsTemplateView" class="pick-row__title">{{ kdzsTemplateView.templateName }}</div>
-              <div v-else class="muted">点击选择模板</div>
+              <div v-else class="muted">点击选择{{ kdzsTemplateGroup }}模板</div>
               <div v-if="kdzsTemplateView" class="muted pick-row__sub">
                 {{
                   [kdzsTemplateView.carrierName, kdzsTemplateView.platform, kdzsTemplateView.shopName]
@@ -354,7 +354,7 @@
 
     <van-popup v-model:show="showKdzsTemplate" position="bottom" round teleport="body" class="sheet-popup" safe-area-inset-bottom>
       <div class="sheet sheet--company">
-        <div class="sheet-title">选择快递模板</div>
+        <div class="sheet-title">选择{{ kdzsTemplateGroup }}模板</div>
         <van-search v-model="kdzsTemplateKeyword" placeholder="搜索模板名 / 快递 / 店铺" shape="round" />
         <div class="company-list">
           <button
@@ -370,7 +370,9 @@
               {{ [t.carrierName, t.platform, t.shopName].filter(Boolean).join(' · ') || t.templateId }}
             </div>
           </button>
-          <div v-if="!filteredKdzsTemplates.length" class="muted pad">无匹配模板（可在发货中心同步快递助手模板）</div>
+          <div v-if="!filteredKdzsTemplates.length" class="muted pad">
+            暂无「{{ kdzsTemplateGroup }}」快递模板，请先在发货中心同步
+          </div>
         </div>
       </div>
     </van-popup>
@@ -549,7 +551,8 @@ const KDZS_DEVICE_KEY = 'opsmobile.kdzs.deviceId'
 const KDZS_TEMPLATE_KEY = 'opsmobile.kdzs.templateKey'
 
 const kdzsDevices = ref<KdzsPrintDevice[]>([])
-const kdzsTemplates = ref<ExpressTemplate[]>([])
+/** 发货中心同步的全部启用模板；展示时再按订单平台组过滤（与电脑端一致） */
+const allKdzsTemplates = ref<ExpressTemplate[]>([])
 const kdzsDeviceId = ref<number | undefined>()
 const kdzsTemplateKey = ref('')
 const kdzsTemplateKeyword = ref('')
@@ -603,6 +606,26 @@ const shipperView = computed(
 )
 const kdzsDeviceView = computed(
   () => kdzsDevices.value.find((x) => x.id === kdzsDeviceId.value) || null,
+)
+/** 与发货中心 PendingOrders 一致：手工单/淘宝 → 菜鸟，抖店 → 抖店… */
+function templatePlatformGroup(o?: OMSOrder | null): string {
+  const code = (o?.platform || '').trim().toUpperCase()
+  const channel = (o?.sourceChannel || '').trim().toLowerCase()
+  if (code === 'FXG' || code === 'DY') return '抖店'
+  if (code === 'TB') return '菜鸟'
+  if (code === 'DFHAND' || code === 'HAND' || code === 'MANUAL' || channel === 'manual') return '菜鸟'
+  if (code === 'XHS') return '小红书'
+  if (code === 'PDD') return '拼多多'
+  if (code === 'KSXD' || code === 'KS') return '快手小店'
+  if (code === 'JD') return '京东'
+  if (code === 'SPH') return '视频号'
+  return '菜鸟'
+}
+const kdzsTemplateGroup = computed(() => templatePlatformGroup(order.value))
+const kdzsTemplates = computed(() =>
+  allKdzsTemplates.value.filter(
+    (t) => t.enabled !== false && t.platform === kdzsTemplateGroup.value,
+  ),
 )
 const kdzsTemplateView = computed(
   () => kdzsTemplates.value.find((t) => templateKey(t) === kdzsTemplateKey.value) || null,
@@ -996,15 +1019,15 @@ async function loadOptions() {
     shippingApi.listShipperProfiles({ page: 1, pageSize: 100, enabled: true }),
     shippingApi.listKdzsPrintDevices().catch(() => ({ list: [] as KdzsPrintDevice[], total: 0 })),
     shippingApi
-      .listExpressTemplates({ page: 1, pageSize: 200 })
-      .catch(() => ({ list: [] as ExpressTemplate[], total: 0, page: 1, pageSize: 200 })),
+      .listExpressTemplates({ page: 1, pageSize: 500 })
+      .catch(() => ({ list: [] as ExpressTemplate[], total: 0, page: 1, pageSize: 500 })),
   ])
   const all = (cRes.list || []).filter((c) => c.enabled !== false)
   const sf = all.filter((c) => /sf|顺丰/i.test(`${c.carrierCode || ''}${c.name || ''}`))
   carriers.value = sf.length ? sf : all
   shippers.value = (sRes.list || []).filter((s) => s.enabled !== false)
   kdzsDevices.value = dRes.list || []
-  kdzsTemplates.value = (tRes.list || []).filter((t) => t.enabled !== false)
+  allKdzsTemplates.value = (tRes.list || []).filter((t) => t.enabled !== false)
 
   const lastC = readLastCarrierId()
   const lastS = readLastShipperId()
@@ -1022,11 +1045,18 @@ async function loadOptions() {
     const online = kdzsDevices.value.find((d) => d.online)
     kdzsDeviceId.value = online?.id || kdzsDevices.value[0]?.id
   }
+  syncKdzsTemplateSelection()
+}
+
+/** 订单加载后按平台组重选模板（手工单只保留菜鸟） */
+function syncKdzsTemplateSelection() {
   const savedTpl = localStorage.getItem(KDZS_TEMPLATE_KEY) || ''
   if (savedTpl && kdzsTemplates.value.some((t) => templateKey(t) === savedTpl)) {
     kdzsTemplateKey.value = savedTpl
   } else if (kdzsTemplates.value[0]) {
     kdzsTemplateKey.value = templateKey(kdzsTemplates.value[0])
+  } else {
+    kdzsTemplateKey.value = ''
   }
 }
 
@@ -1159,7 +1189,7 @@ async function goKdzsPrint() {
   }
   const tpl = kdzsTemplateView.value
   if (!tpl?.templateName && !tpl?.templateId) {
-    showFailToast('请选择快递模板')
+    showFailToast(`请选择${kdzsTemplateGroup.value}模板`)
     return
   }
   const printer = readKdzsPrinterName()
@@ -1250,6 +1280,8 @@ onMounted(async () => {
   try {
     await loadOptions()
     order.value = id ? await loadOrder(id) : null
+    // 订单平台决定模板组（手工单 → 菜鸟）；需在 order 赋值后再同步选中项
+    syncKdzsTemplateSelection()
     if (order.value) await initShipPickSelection(order.value)
     if (route.query.split === '1' && order.value) {
       await openSplitEdit()
