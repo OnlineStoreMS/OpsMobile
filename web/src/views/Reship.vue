@@ -644,6 +644,7 @@ async function goKdzsTask() {
     printerName: printer || '',
     orders: [
       {
+        orderId: o.id,
         orderNo: o.orderNo || '',
         platformSysTid: '',
         platformOrderId: '',
@@ -658,6 +659,10 @@ async function goKdzsTask() {
       },
     ],
     autoPrint: true,
+    autoConfirmShip: true,
+    reship: true,
+    orderId: o.id,
+    order: snap,
   }
   submitting.value = true
   try {
@@ -667,7 +672,7 @@ async function goKdzsTask() {
       deviceId: kdzsDeviceId.value,
       payload,
     })
-    showSuccessToast(`已下发任务 #${task.id}，打完后填写新运单号确认`)
+    showSuccessToast(`已下发任务 #${task.id}，打印完成后将自动确认发货`)
   } catch (e) {
     showFailToast((e as Error).message || '下发失败')
   } finally {

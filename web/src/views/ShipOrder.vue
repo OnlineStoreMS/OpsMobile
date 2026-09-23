@@ -1213,6 +1213,7 @@ async function goKdzsPrint() {
     printerName: printer || '',
     orders: [
       {
+        orderId: order.value.id,
         orderNo: order.value.orderNo || '',
         platformSysTid: order.value.platformSysTid || '',
         platformOrderId: order.value.platformOrderId || '',
@@ -1234,6 +1235,9 @@ async function goKdzsPrint() {
     orderTimeFrom: timeRange?.from,
     orderTimeTo: timeRange?.to,
     autoPrint: true,
+    autoConfirmShip: true,
+    orderId: order.value.id,
+    order: snapshot,
   }
   submitting.value = true
   try {
@@ -1243,7 +1247,7 @@ async function goKdzsPrint() {
       deviceId: kdzsDeviceId.value,
       payload,
     })
-    showSuccessToast(`已下发任务 #${task.id}，电脑将自动勾选订单`)
+    showSuccessToast(`已下发任务 #${task.id}，打印完成后将自动确认发货`)
     await router.replace('/pending')
   } catch (e) {
     showFailToast((e as Error).message || '下发失败')
