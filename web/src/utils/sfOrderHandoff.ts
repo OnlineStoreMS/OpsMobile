@@ -27,6 +27,26 @@ export function rootOMSItems(order?: OMSOrder | null) {
   return (order?.items || []).filter((it) => !isOMSSplitChild(it))
 }
 
+/** 已退款完成/行关闭：仍展示，但不参与发货勾选 */
+export function isOMSItemRefundDone(it?: {
+  afterSaleStatus?: string
+  afterSaleStatusText?: string
+  lineOrderStatus?: string
+} | null) {
+  if (!it) return false
+  const text = (it.afterSaleStatusText || '').trim()
+  if (/退款(完成|成功)/.test(text)) return true
+  const as = (it.afterSaleStatus || '').toUpperCase()
+  if (/REFUND_(SUCCESS|MONEY_FINISH|MONEY_SUCCESS)|REFUNDED|SUCCESS_REFUND/.test(as)) return true
+  if (as.includes('REFUND') && /(SUCCESS|FINISH|DONE)/.test(as)) return true
+  const os = (it.lineOrderStatus || '').toUpperCase()
+  return /ORDER_CANCELLED|TRADE_CLOSED|CANCELLED/.test(os) && as.includes('REFUND')
+}
+
+export function fulfillableRootOMSItems(order?: OMSOrder | null) {
+  return rootOMSItems(order).filter((it) => !isOMSItemRefundDone(it))
+}
+
 /** 订单同步后根行 id 可能变化，拆分计划上的 orderItemId 会失效；尽量重绑到当前根行 */
 export function rematchPlanParentId(
   order: OMSOrder,
@@ -285,6 +305,7 @@ export function orderGoodsDisplayRows(order: OMSOrder) {
     total: number
     fullyShipped: boolean
     isSplit: boolean
+    refundBadge?: string
   }
   const rows: Row[] = []
   const rootItems = rootOMSItems(order)
@@ -318,6 +339,7 @@ export function orderGoodsDisplayRows(order: OMSOrder) {
         total: qty,
         fullyShipped: false,
         isSplit: true,
+        refundBadge: isOMSItemRefundDone(item) ? '退款完成' : '',
       })
     }
     for (const p of shippedPlans) {
@@ -332,6 +354,7 @@ export function orderGoodsDisplayRows(order: OMSOrder) {
         total: qty,
         fullyShipped: true,
         isSplit: true,
+        refundBadge: isOMSItemRefundDone(item) ? '退款完成' : '',
       })
     }
     rootItems.forEach((g, idx) => {
@@ -347,6 +370,7 @@ export function orderGoodsDisplayRows(order: OMSOrder) {
         total,
         fullyShipped: shipped > 0 && total > 0 && shipped >= total,
         isSplit: false,
+        refundBadge: isOMSItemRefundDone(g) ? '退款完成' : '',
       })
     })
     return rows
@@ -364,6 +388,7 @@ export function orderGoodsDisplayRows(order: OMSOrder) {
       total,
       fullyShipped: shipped > 0 && total > 0 && shipped >= total,
       isSplit: false,
+      refundBadge: isOMSItemRefundDone(g) ? '退款完成' : '',
     }
   })
 }
@@ -415,7 +440,7 @@ export function buildShipPickRows(order: OMSOrder, planLines: ShipPlanLine[]) {
 
   const covered = new Set(pending.map((l) => l.orderItemId).filter((id) => id > 0))
   rootOMSItems(order).forEach((item, index) => {
-    if (!item?.id || covered.has(item.id)) return
+    if (!item?.id || covered.has(item.id) || isOMSItemRefundDone(item)) return
     const left = remaining[item.id] ?? item.quantity ?? 0
     if (left <= 0) return
     const spec = (item.skuSpecs || '').trim()

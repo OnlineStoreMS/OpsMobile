@@ -181,6 +181,9 @@ export interface OMSOrderItem {
   price?: number
   totalAmount?: number
   picUrl?: string
+  afterSaleStatus?: string
+  afterSaleStatusText?: string
+  lineOrderStatus?: string
   parentOrderItemId?: number
   splitKind?: '' | 'partial' | 'full'
   shipPlanLineId?: number

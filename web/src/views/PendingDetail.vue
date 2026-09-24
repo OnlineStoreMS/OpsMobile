@@ -50,13 +50,16 @@
       <div class="section-label">商品明细</div>
       <div class="card">
         <div v-for="row in goodsRows" :key="row.key" class="goods-row">
-          <img
-            v-if="row.picUrl"
-            class="pic-preview"
-            :src="row.picUrl"
-            alt=""
-            @click.stop="previewProductImage(row.picUrl, goodsRows.map((r) => r.picUrl))"
-          />
+          <div class="goods-pic-wrap">
+            <img
+              v-if="row.picUrl"
+              class="pic-preview"
+              :src="row.picUrl"
+              alt=""
+              @click.stop="previewProductImage(row.picUrl, goodsRows.map((r) => r.picUrl))"
+            />
+            <span v-if="row.refundBadge" class="goods-refund-badge">{{ row.refundBadge }}</span>
+          </div>
           <div class="goods-info">
             <div class="goods-name">
               {{ row.title }}
@@ -205,6 +208,39 @@ onMounted(async () => {
   padding: 1px 6px;
   border-radius: 999px;
   vertical-align: middle;
+}
+.goods-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0;
+}
+.goods-pic-wrap {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+.goods-pic-wrap .pic-preview {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+  background: #eef2f5;
+}
+.goods-refund-badge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1px 0;
+  font-size: 9px;
+  line-height: 1.2;
+  text-align: center;
+  color: #fff;
+  background: rgba(245, 108, 108, 0.92);
+  border-radius: 0 0 8px 8px;
 }
 .footer-safe {
   position: sticky;

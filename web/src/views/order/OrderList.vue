@@ -76,17 +76,20 @@
 
           <div class="goods-preview" v-if="rootItems(row).length">
             <div v-for="it in rootItems(row).slice(0, 3)" :key="it.id || it.skuCode" class="goods-preview__row">
-              <img
-                v-if="it.picUrl"
-                class="pic-preview"
-                :src="it.picUrl"
-                alt=""
-                @click.stop="previewProductImage(it.picUrl, rootItems(row).map((g) => g.picUrl))"
-              />
+              <div class="goods-preview__pic">
+                <img
+                  v-if="it.picUrl"
+                  class="pic-preview"
+                  :src="it.picUrl"
+                  alt=""
+                  @click.stop="previewProductImage(it.picUrl, rootItems(row).map((g) => g.picUrl))"
+                />
+                <span v-if="itemRefundBadge(it)" class="goods-refund-badge">{{ itemRefundBadge(it) }}</span>
+              </div>
               <div class="goods-preview__info">
                 <div class="goods-preview__title">{{ listItemTitle(it) }}</div>
                 <div class="muted" v-if="listItemMeta(it).spec">{{ listItemMeta(it).spec }}</div>
-                <div class="muted">×{{ it.quantity }}</div>
+                <div class="muted">×{{ it.quantity }} · ¥{{ Number(it.price || 0).toFixed(2) }}</div>
               </div>
             </div>
             <div v-if="rootItems(row).length > 3" class="muted more-goods">
@@ -289,7 +292,7 @@ import {
   type OmsOrder,
   type OmsSupplier,
 } from '../../api/oms'
-import { listItemMeta, listItemTitle, listOrderRootItems } from '../../utils/orderItemTree'
+import { listItemMeta, listItemTitle, listOrderRootItems, itemRefundBadge } from '../../utils/orderItemTree'
 import { copyToClipboard } from '../../utils/clipboard'
 import {
   buildOrderCopyText,
@@ -834,13 +837,33 @@ watch(
   gap: 8px;
   padding: 4px 0;
 }
-.goods-preview__row img {
+.goods-preview__pic {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.goods-preview__row img,
+.goods-preview__pic .pic-preview {
   width: 44px;
   height: 44px;
   border-radius: 10px;
   object-fit: cover;
   background: #eef2f5;
-  flex-shrink: 0;
+  display: block;
+}
+.goods-refund-badge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1px 0;
+  font-size: 9px;
+  line-height: 1.2;
+  text-align: center;
+  color: #fff;
+  background: rgba(245, 108, 108, 0.92);
+  border-radius: 0 0 10px 10px;
 }
 .goods-preview__info {
   min-width: 0;
