@@ -1247,8 +1247,8 @@ async function goKdzsPrint() {
       deviceId: kdzsDeviceId.value,
       payload,
     })
-    showSuccessToast(`已下发任务 #${task.id}，打印完成后将自动确认发货`)
-    await router.replace('/pending')
+    showSuccessToast(`已下发任务 #${task.id}，可在打单机页查看进度`)
+    await router.replace('/kdzs-print')
   } catch (e) {
     showFailToast((e as Error).message || '下发失败')
   } finally {

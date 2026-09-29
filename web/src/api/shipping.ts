@@ -489,5 +489,9 @@ export interface KdzsPrintTask {
   status: string
   payload?: unknown
   errorMessage?: string
+  mailNo?: string
+  shipConfirmedAt?: string
   createdAt: string
+  claimedAt?: string
+  finishedAt?: string
 }

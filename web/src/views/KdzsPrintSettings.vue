@@ -54,9 +54,19 @@
       <div class="card">
         <div v-if="!tasks.length" class="muted empty">暂无任务</div>
         <div v-for="t in tasks" :key="t.id" class="task-row">
-          <div>#{{ t.id }} · {{ statusLabel(t.status) }}</div>
+          <div class="task-title">
+            #{{ t.id }} · {{ statusLabel(t.status) }}
+            <span v-if="t.shipConfirmedAt" class="ok-tag">已确认发货</span>
+          </div>
+          <div v-if="t.mailNo" class="mail">运单号 {{ t.mailNo }}</div>
           <div class="muted">{{ formatTime(t.createdAt) }}</div>
           <div v-if="t.errorMessage" class="err">{{ t.errorMessage }}</div>
+          <div v-else-if="t.status === 'done' && !t.shipConfirmedAt && !t.mailNo" class="muted">
+            打印完成，等待回填运单号…
+          </div>
+          <div v-else-if="t.status === 'done' && t.mailNo && !t.shipConfirmedAt" class="warn">
+            已有运单号，确认发货中…
+          </div>
         </div>
       </div>
     </div>
@@ -178,6 +188,34 @@ onUnmounted(() => {
   color: #b91c1c;
   font-size: 12px;
   margin-top: 2px;
+}
+.warn {
+  color: #b45309;
+  font-size: 12px;
+  margin-top: 2px;
+}
+.ok-tag {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #047857;
+  background: #ecfdf5;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.task-title {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.mail {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #0f766e;
+  letter-spacing: 0.02em;
 }
 .muted {
   color: #94a3b8;
