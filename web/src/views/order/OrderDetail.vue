@@ -161,6 +161,22 @@
 
     <van-action-sheet v-model:show="allocVisible" title="分配履约" :closeable="true">
       <div class="sheet-body">
+        <template v-if="allocatableItems.length">
+          <div class="sheet-label">分配商品（可勾选部分）</div>
+          <van-checkbox-group v-model="allocItemIds">
+            <van-checkbox
+              v-for="it in allocatableItems"
+              :key="it.id"
+              :name="it.id"
+              shape="square"
+              class="alloc-item-check"
+            >
+              {{ listItemTitle(it) }}
+              <span v-if="it.skuSpecs"> · {{ it.skuSpecs }}</span>
+              ×{{ it.quantity || 1 }}
+            </van-checkbox>
+          </van-checkbox-group>
+        </template>
         <div class="sheet-label">履约方式</div>
         <van-radio-group v-model="allocForm.allocType" direction="horizontal">
           <van-radio name="self_ship">自营发货</van-radio>
@@ -204,6 +220,8 @@ import {
   buildItemTreeRows,
   itemTreeMeta,
   itemTreeTitle,
+  listAllocatableRootItems,
+  listItemTitle,
   splitKindLabel,
 } from '../../utils/orderItemTree'
 import { copyToClipboard } from '../../utils/clipboard'
@@ -229,6 +247,8 @@ const allocForm = reactive({
   supplierId: 0,
   supplierName: '',
 })
+const allocItemIds = ref<number[]>([])
+const allocatableItems = computed(() => listAllocatableRootItems(detail.value?.items))
 
 const canDecrypt = computed(() => {
   const o = detail.value
@@ -335,6 +355,7 @@ async function openAlloc() {
   allocForm.supplierId = 0
   allocForm.supplierName = ''
   supplierKeyword.value = ''
+  allocItemIds.value = allocatableItems.value.map((it) => it.id!).filter(Boolean)
   try {
     const res = await omsApi.listSuppliers({ page: 1, pageSize: 200 })
     suppliers.value = res.list || []
@@ -359,6 +380,10 @@ function pickSupplier(s: OmsSupplier) {
 
 async function submitAlloc() {
   if (!detail.value) return
+  if (allocatableItems.value.length && !allocItemIds.value.length) {
+    showFailToast('请至少勾选一件商品')
+    return
+  }
   if (allocForm.allocType === 'dropship' && !allocForm.supplierId) {
     showFailToast('请选择供应商')
     return
@@ -369,6 +394,7 @@ async function submitAlloc() {
       allocType: allocForm.allocType,
       supplierId: allocForm.allocType === 'dropship' ? allocForm.supplierId : undefined,
       supplierName: allocForm.allocType === 'dropship' ? allocForm.supplierName : undefined,
+      orderItemIds: allocItemIds.value.length ? allocItemIds.value : undefined,
     })
     showSuccessToast(
       detail.value.purchaseOrderId ? `分配成功 · ${detail.value.purchaseOrderId}` : '分配成功',
@@ -550,6 +576,13 @@ onMounted(load)
   color: var(--ops-primary);
   font-weight: 650;
   background: var(--ops-primary-soft);
+}
+.alloc-item-check {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  font-size: 13px;
+  line-height: 1.4;
 }
 .footer-safe__row {
   display: flex;

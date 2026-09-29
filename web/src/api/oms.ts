@@ -7,6 +7,7 @@ export interface OmsOrderItem {
   skuId?: number
   skuCode?: string
   platformSkuId?: string
+  platformOid?: string
   productName?: string
   skuSpecs?: string
   picUrl?: string

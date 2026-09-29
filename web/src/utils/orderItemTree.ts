@@ -17,6 +17,11 @@ export function listOrderRootItems(items: OmsOrderItem[] | undefined): OmsOrderI
   return (items || []).filter((it) => !isSplitChildItem(it))
 }
 
+/** 可履约根行，用于商品级分配勾选 */
+export function listAllocatableRootItems(items: OmsOrderItem[] | undefined): OmsOrderItem[] {
+  return listOrderRootItems(items).filter((it) => !itemRefundBadge(it) && (it.quantity || 0) > 0)
+}
+
 /** 详情用：根行 + └ 拆分子行 */
 export function buildItemTreeRows(items: OmsOrderItem[] | undefined): ItemTreeRow[] {
   if (!items?.length) return []
