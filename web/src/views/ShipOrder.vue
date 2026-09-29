@@ -1154,14 +1154,16 @@ async function goQuick() {
       order: snapshot,
     })
     const waybill = await shippingApi.createShipmentWaybill(shipment.id)
-    await printShipmentByChannel({
+    const mail = (waybill.mailNo || '').trim()
+    showSuccessToast(mail ? `下单成功 ${mail}，正在出纸…` : '下单成功，正在出纸…')
+    submitting.value = false
+    void printShipmentByChannel({
       shipmentId: waybill.id,
       printChannel: channel,
       printerIndex,
+    }).catch((pe) => {
+      showFailToast((pe as Error).message || '打印失败，可到已发货重打')
     })
-    showSuccessToast(
-      `已下单${waybill.mailNo ? ` ${waybill.mailNo}` : ''}，已发往 ${getSavedPrinterName() || '打印机'}`,
-    )
     if (isPartialSelection.value) {
       await router.replace({ path: '/pending', query: { tab: 'partial' } })
     } else {
@@ -1169,7 +1171,6 @@ async function goQuick() {
     }
   } catch (e) {
     showFailToast((e as Error).message || '打单失败')
-  } finally {
     submitting.value = false
   }
 }

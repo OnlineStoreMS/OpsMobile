@@ -905,18 +905,17 @@ async function submit(doPrint: boolean) {
         ? `部分发货成功${waybill.mailNo ? `，${waybill.mailNo}` : ''}（可回待发货继续发剩余）`
         : `下单成功${waybill.mailNo ? `，${waybill.mailNo}` : ''}`
     showSuccessToast(okMsg)
+    submitting.value = false
     if (doPrint) {
-      try {
-        await printShipmentLabel(waybill.id)
-        showSuccessToast('已发送到打印机')
-      } catch (pe) {
-        const msg = (pe as Error).message || ''
-        if (msg !== 'PRINTER_NOT_SELECTED') showFailToast(msg || '打印失败')
-      }
+      void printShipmentLabel(waybill.id)
+        .then(() => showSuccessToast('已发送到打印机'))
+        .catch((pe) => {
+          const msg = (pe as Error).message || ''
+          if (msg !== 'PRINTER_NOT_SELECTED') showFailToast(msg || '打印失败')
+        })
     }
   } catch (e) {
     showFailToast((e as Error).message || '下单失败')
-  } finally {
     submitting.value = false
   }
 }

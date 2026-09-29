@@ -733,18 +733,19 @@ async function goQuick() {
       order: snap,
     })
     const waybill = await shippingApi.createShipmentWaybill(shipment.id)
-    await printShipmentByChannel({
+    const mail = (waybill.mailNo || '').trim()
+    showSuccessToast(mail ? `重新发货成功 ${mail}，正在出纸…` : '重新发货成功，正在出纸…')
+    submitting.value = false
+    void printShipmentByChannel({
       shipmentId: waybill.id,
       printChannel: channel,
       printerIndex,
+    }).catch((pe) => {
+      showFailToast((pe as Error).message || '打印失败，可到已发货重打')
     })
-    showSuccessToast(
-      `已重新发货${waybill.mailNo ? ` ${waybill.mailNo}` : ''} · ${getSavedPrinterName() || '打印机'}`,
-    )
     await router.replace(`/shipped/${waybill.id}`)
   } catch (e) {
     showFailToast((e as Error).message || '打单失败')
-  } finally {
     submitting.value = false
   }
 }
