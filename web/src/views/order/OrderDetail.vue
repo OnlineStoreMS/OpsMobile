@@ -412,13 +412,22 @@ async function onRevoke() {
   try {
     await showConfirmDialog({
       title: '撤回分配',
-      message: '确认撤回？将同步快递助手撤单，订单恢复为待分配。',
+      message: '确认撤回？将同步快递助手撤单，订单恢复为待分配；商品级拆分子单在原单空闲时会自动合回。',
     })
   } catch {
     return
   }
   try {
+    const prevId = detail.value.id
     detail.value = await omsApi.revokeAllocate(detail.value.id)
+    if (detail.value?.id && detail.value.id !== prevId) {
+      showSuccessToast('已撤回并合回原销售单')
+      await router.replace({
+        path: `/orders/${detail.value.id}`,
+        query: detail.value.orderNo ? { no: detail.value.orderNo } : undefined,
+      })
+      return
+    }
     showSuccessToast('已撤回分配')
   } catch (e: any) {
     showFailToast(e.message || '撤回失败')

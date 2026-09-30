@@ -549,7 +549,7 @@ async function quickRevoke(row: OmsOrder) {
   try {
     await showConfirmDialog({
       title: '撤回分配',
-      message: '确认撤回？将同步快递助手撤单，订单恢复为待分配。',
+      message: '确认撤回？将同步快递助手撤单，订单恢复为待分配；拆分子单在原单空闲时会合回。',
     })
   } catch {
     return
