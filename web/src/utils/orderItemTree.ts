@@ -83,6 +83,15 @@ export function listItemTitle(it: OmsOrderItem): string {
   return (it.productName || it.skuCode || '商品').trim() || '商品'
 }
 
+/** 分配勾选行：只显示规格（无规格再退 SKU） */
+export function allocItemLabel(it: Pick<OmsOrderItem, 'skuSpecs' | 'skuCode'>): string {
+  const spec = (it.skuSpecs || '').trim()
+  if (spec) return spec
+  const sku = (it.skuCode || '').trim()
+  if (sku) return sku
+  return '规格'
+}
+
 export function listItemMeta(it: OmsOrderItem): { spec?: string; sku?: string } {
   const title = listItemTitle(it)
   const spec = (it.skuSpecs || '').trim()

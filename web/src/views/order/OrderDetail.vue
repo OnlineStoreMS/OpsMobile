@@ -171,8 +171,7 @@
               shape="square"
               class="alloc-item-check"
             >
-              {{ listItemTitle(it) }}
-              <span v-if="it.skuSpecs"> · {{ it.skuSpecs }}</span>
+              {{ allocItemLabel(it) }}
               ×{{ it.quantity || 1 }}
             </van-checkbox>
           </van-checkbox-group>
@@ -217,11 +216,11 @@ import {
   type OmsSupplier,
 } from '../../api/oms'
 import {
+  allocItemLabel,
   buildItemTreeRows,
   itemTreeMeta,
   itemTreeTitle,
   listAllocatableRootItems,
-  listItemTitle,
   splitKindLabel,
 } from '../../utils/orderItemTree'
 import { copyToClipboard } from '../../utils/clipboard'
