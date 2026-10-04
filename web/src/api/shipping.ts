@@ -494,4 +494,7 @@ export interface KdzsPrintTask {
   createdAt: string
   claimedAt?: string
   finishedAt?: string
+  /** 已并入同设备同类 pending 批量任务 */
+  merged?: boolean
+  orderCount?: number
 }

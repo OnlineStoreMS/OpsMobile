@@ -672,7 +672,13 @@ async function goKdzsTask() {
       deviceId: kdzsDeviceId.value,
       payload,
     })
-    showSuccessToast(`已下发任务 #${task.id}，可在打单机页查看进度`)
+    if (task.merged) {
+      showSuccessToast(
+        `已合并进排队批量 #${task.id}${task.orderCount ? `（共 ${task.orderCount} 单）` : ''}`,
+      )
+    } else {
+      showSuccessToast(`已下发任务 #${task.id}，可在打单机页查看进度`)
+    }
     await router.push('/kdzs-print')
   } catch (e) {
     showFailToast((e as Error).message || '下发失败')
