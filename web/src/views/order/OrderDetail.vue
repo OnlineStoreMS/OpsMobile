@@ -50,6 +50,18 @@
             {{ isMaskedReceiver(detail) ? '解密地址' : '重新解密' }}
           </van-button>
           <van-button
+            v-if="canDecryptPhone"
+            size="mini"
+            plain
+            hairline
+            round
+            type="warning"
+            :loading="decryptingPhone"
+            @click="decryptPhone"
+          >
+            解密真实手机号
+          </van-button>
+          <van-button
             v-if="formatAddress(detail.address) !== '-'"
             size="mini"
             plain
@@ -236,6 +248,7 @@ const router = useRouter()
 const route = useRoute()
 const detail = ref<OmsOrder | null>(null)
 const decrypting = ref(false)
+const decryptingPhone = ref(false)
 const allocVisible = ref(false)
 const submitting = ref(false)
 const suppliers = ref<OmsSupplier[]>([])
@@ -252,6 +265,10 @@ const allocatableItems = computed(() => listAllocatableRootItems(detail.value?.i
 const canDecrypt = computed(() => {
   const o = detail.value
   return !!o && canDecryptOrder(o)
+})
+const canDecryptPhone = computed(() => {
+  const o = detail.value
+  return !!o && omsApi.canDecryptRealPhone(o)
 })
 const itemTree = computed(() => buildItemTreeRows(detail.value?.items))
 const itemTreePics = computed(() => itemTree.value.map((r) => r.item.picUrl).filter(Boolean) as string[])
@@ -334,6 +351,22 @@ async function decryptAddr() {
     showFailToast(e.message || '解密失败')
   } finally {
     decrypting.value = false
+  }
+}
+
+async function decryptPhone() {
+  if (!detail.value || !canDecryptPhone.value) {
+    showFailToast('仅抖店订单可解密真实手机号')
+    return
+  }
+  decryptingPhone.value = true
+  try {
+    detail.value = await omsApi.decryptRealPhone(detail.value.id)
+    showSuccessToast('真实手机号解密成功')
+  } catch (e: any) {
+    showFailToast(e.message || '解密真实手机号失败')
+  } finally {
+    decryptingPhone.value = false
   }
 }
 

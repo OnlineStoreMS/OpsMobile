@@ -216,6 +216,46 @@ export const omsApi = {
       await orderClient.post('/orders/decrypt', { orderIds }),
     ),
 
+  /** 是否可下发抖店 WA「解密真实手机号」（与订单中心电脑端一致） */
+  canDecryptRealPhone: (order: Pick<OmsOrder, 'platform' | 'shopId' | 'platformOrderId'>) => {
+    const p = (order.platform || '').trim().toUpperCase()
+    return (p === 'FXG' || p === 'DOUDIAN') && !!order.shopId?.trim() && !!order.platformOrderId?.trim()
+  },
+
+  startDecryptPhone: async (orderId: number) =>
+    unwrap<{ jobId: number; orderId: number; orderNo: string }>(
+      await orderClient.post(`/orders/${orderId}/decrypt-phone`),
+    ),
+
+  pollDecryptPhone: async (orderId: number, jobId: number) =>
+    unwrap<{
+      jobId: number
+      status: string
+      errorMessage?: string
+      applied?: boolean
+      order?: OmsOrder | null
+    }>(await orderClient.get(`/orders/${orderId}/decrypt-phone`, { params: { jobId } })),
+
+  /** 下发并轮询抖店解密真实手机号，成功后返回写回后的订单 */
+  decryptRealPhone: async (orderId: number, opts?: { intervalMs?: number; timeoutMs?: number }) => {
+    const intervalMs = opts?.intervalMs ?? 2000
+    const timeoutMs = opts?.timeoutMs ?? 180_000
+    const started = await omsApi.startDecryptPhone(orderId)
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, intervalMs))
+      const st = await omsApi.pollDecryptPhone(orderId, started.jobId)
+      if (st.status === 'succeeded') {
+        if (st.order) return st.order
+        throw new Error('解密成功但未返回订单')
+      }
+      if (st.status === 'failed' || st.status === 'cancelled') {
+        throw new Error(st.errorMessage || '解密任务失败')
+      }
+    }
+    throw new Error('解密超时，请确认 WindowsAgent 已在线且该店勾选了解密手机号能力')
+  },
+
   pushOrder: async (id: number, event = 'manual_push') =>
     unwrap<OmsOrder>(await orderClient.post(`/orders/${id}/push`, null, { params: { event } })),
 

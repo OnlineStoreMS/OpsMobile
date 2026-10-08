@@ -98,9 +98,9 @@
           </div>
 
           <div class="receiver-line">{{ formatAddress(row.address) }}</div>
-          <div v-if="canDecryptOrder(row)" class="addr-actions" @click.stop>
+          <div v-if="canDecryptOrder(row) || omsApi.canDecryptRealPhone(row)" class="addr-actions" @click.stop>
             <van-button
-              v-if="isMaskedReceiver(row)"
+              v-if="canDecryptOrder(row) && isMaskedReceiver(row)"
               size="mini"
               plain
               hairline
@@ -112,7 +112,7 @@
               解密
             </van-button>
             <van-button
-              v-else
+              v-else-if="canDecryptOrder(row)"
               size="mini"
               plain
               hairline
@@ -123,7 +123,7 @@
               复制
             </van-button>
             <van-button
-              v-if="!isMaskedReceiver(row)"
+              v-if="canDecryptOrder(row) && !isMaskedReceiver(row)"
               size="mini"
               plain
               hairline
@@ -133,6 +133,18 @@
               @click="decryptOne(row)"
             >
               重新解密
+            </van-button>
+            <van-button
+              v-if="omsApi.canDecryptRealPhone(row)"
+              size="mini"
+              plain
+              hairline
+              round
+              type="warning"
+              :loading="decryptPhoneRow[row.id]"
+              @click="decryptPhoneOne(row)"
+            >
+              真实手机号
             </van-button>
           </div>
           <div class="muted meta-line">
@@ -332,6 +344,7 @@ const allocForm = reactive({
 const batchSupplierId = ref(0)
 const batchSupplierName = ref('')
 const decryptRow = reactive<Record<number, boolean>>({})
+const decryptPhoneRow = reactive<Record<number, boolean>>({})
 const shipCounts = ref<Record<string, number>>({})
 const typeCounts = ref<Record<string, number>>({})
 
@@ -582,6 +595,23 @@ async function decryptOne(row: OmsOrder) {
     showFailToast(e.message || '解密失败')
   } finally {
     decryptRow[row.id] = false
+  }
+}
+
+async function decryptPhoneOne(row: OmsOrder) {
+  if (!omsApi.canDecryptRealPhone(row)) {
+    showFailToast('仅抖店订单可解密真实手机号')
+    return
+  }
+  decryptPhoneRow[row.id] = true
+  try {
+    const updated = await omsApi.decryptRealPhone(row.id)
+    applyDecryptedOrders([updated])
+    showSuccessToast('真实手机号解密成功')
+  } catch (e: any) {
+    showFailToast(e.message || '解密真实手机号失败')
+  } finally {
+    decryptPhoneRow[row.id] = false
   }
 }
 
