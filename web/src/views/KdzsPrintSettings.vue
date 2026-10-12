@@ -19,17 +19,17 @@
       <div class="section-label">默认打印机</div>
       <div class="card">
         <div class="muted tip">
-          选填。填写电脑打印弹窗里的完整打印机名称（须一字不差）。不填则用弹窗当前默认。
+          发货中心「默认打印机」配置后自动带入。也可手改；须为打单电脑打印弹窗中的完整名称。
         </div>
         <van-field
           v-model="printerName"
           label="打印机"
-          placeholder="可留空"
+          placeholder="远程电脑打印机全名"
           clearable
           maxlength="120"
         />
         <van-button block type="primary" plain :loading="savingPrinter" @click="savePrinter">
-          保存打印机
+          保存
         </van-button>
       </div>
 
@@ -78,7 +78,12 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast } from 'vant'
 import { shippingApi, type KdzsPrintDevice, type KdzsPrintTask } from '../api/shipping'
-import { readKdzsPrinterName, writeKdzsPrinterName } from '../utils/kdzsPrinter'
+import {
+  loadCloudKdzsPrinterName,
+  readKdzsPrinterName,
+  resolveKdzsPrinterName,
+  saveKdzsPrinterName,
+} from '../utils/kdzsPrinter'
 
 const router = useRouter()
 const loading = ref(false)
@@ -109,12 +114,14 @@ function statusLabel(s: string) {
 async function refresh() {
   loading.value = true
   try {
-    const [devs, ts] = await Promise.all([
+    const [, devs, ts] = await Promise.all([
+      loadCloudKdzsPrinterName(),
       shippingApi.listKdzsPrintDevices(),
       shippingApi.listKdzsPrintTasks(),
     ])
     devices.value = devs.list || []
     tasks.value = ts.list || []
+    printerName.value = resolveKdzsPrinterName()
   } catch (e) {
     showFailToast((e as Error).message || '加载失败')
   } finally {
@@ -122,13 +129,15 @@ async function refresh() {
   }
 }
 
-function savePrinter() {
+async function savePrinter() {
   const name = printerName.value.trim()
   savingPrinter.value = true
   try {
-    writeKdzsPrinterName(name)
+    await saveKdzsPrinterName(name)
     printerName.value = name
-    showSuccessToast(name ? '打印机已保存' : '已清空')
+    showSuccessToast(name ? '已保存' : '已清空')
+  } catch (e) {
+    showFailToast((e as Error).message || '保存失败')
   } finally {
     savingPrinter.value = false
   }

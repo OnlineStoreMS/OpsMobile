@@ -329,8 +329,14 @@ import {
   saveSFOrderHandoff,
 } from '../utils/sfOrderHandoff'
 import { printShipmentByChannel } from '../utils/sfPrintLabel'
-import { getSavedPrinterIndex, getSavedPrinterName } from '../utils/sfPrintPlugin'
-import { readKdzsPrinterName } from '../utils/kdzsPrinter'
+import {
+  loadCloudSfPrinterName,
+  resolvePreferredPrinterIndex,
+} from '../utils/sfPrintPlugin'
+import {
+  loadCloudKdzsPrinterName,
+  resolveKdzsPrinterName,
+} from '../utils/kdzsPrinter'
 import { findExpressCompany, searchExpressCompanies, type ExpressCompany } from '../utils/expressWaybill'
 
 const RESHIP_KDZS_PLATFORM = 'DFHAND'
@@ -632,8 +638,13 @@ async function goKdzsTask() {
     showFailToast('请选择菜鸟模板')
     return
   }
-  const printer = readKdzsPrinterName()
-  // 可不填：优先 Agent 任务默认打印机；都空则用弹窗当前默认
+  await loadCloudKdzsPrinterName()
+  const printer = resolveKdzsPrinterName()
+  if (!printer) {
+    showFailToast('请先配置远程打印机名称')
+    await router.push('/kdzs-print')
+    return
+  }
   const snap = buildSnapshot(o)
   const payload: Record<string, unknown> = {
     v: 1,
@@ -641,7 +652,7 @@ async function goKdzsTask() {
     platform: RESHIP_KDZS_PLATFORM,
     templateName: tpl.templateName || '',
     templateId: tpl.templateId,
-    printerName: printer || '',
+    printerName: printer,
     orders: [
       {
         orderId: o.id,
@@ -708,7 +719,8 @@ async function goQuick() {
     showFailToast('请选择物流账号和寄件人')
     return
   }
-  const printerIndex = getSavedPrinterIndex()
+  await loadCloudSfPrinterName()
+  const printerIndex = await resolvePreferredPrinterIndex()
   const carrier = carrierView.value
   const channel = (carrier?.printChannel || 'plugin').toLowerCase()
   if (channel !== 'pdf' && printerIndex == null) {

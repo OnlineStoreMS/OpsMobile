@@ -237,7 +237,10 @@ import {
   type KdzsPrintDevice,
   type OMSOrder,
 } from '../api/shipping'
-import { readKdzsPrinterName } from '../utils/kdzsPrinter'
+import {
+  loadCloudKdzsPrinterName,
+  resolveKdzsPrinterName,
+} from '../utils/kdzsPrinter'
 import { formatOrderSource, formatTime, labelShipStatus } from '../utils/labels'
 import {
   formatOrderGoodsSummary,
@@ -269,7 +272,7 @@ const allTemplates = ref<ExpressTemplate[]>([])
 const kdzsDeviceId = ref<number | undefined>()
 const kdzsTemplateKey = ref('')
 const templateKeyword = ref('')
-const kdzsPrinterName = ref(readKdzsPrinterName())
+const kdzsPrinterName = ref(resolveKdzsPrinterName())
 
 const selectedOrders = computed(() =>
   list.value.filter((o) => selectedIds.value.includes(o.id)),
@@ -443,7 +446,8 @@ function pickTemplate(t: ExpressTemplate) {
 }
 
 async function loadKdzsOptions() {
-  const [dRes, tRes] = await Promise.all([
+  const [printer, dRes, tRes] = await Promise.all([
+    loadCloudKdzsPrinterName(),
     shippingApi.listKdzsPrintDevices().catch(() => ({ list: [] as KdzsPrintDevice[], total: 0 })),
     shippingApi
       .listExpressTemplates({ page: 1, pageSize: 500 })
@@ -451,7 +455,7 @@ async function loadKdzsOptions() {
   ])
   kdzsDevices.value = dRes.list || []
   allTemplates.value = (tRes.list || []).filter((t) => t.enabled !== false)
-  kdzsPrinterName.value = readKdzsPrinterName()
+  kdzsPrinterName.value = printer || resolveKdzsPrinterName()
 
   const savedDev = Number(localStorage.getItem(KDZS_DEVICE_KEY) || 0)
   if (savedDev && kdzsDevices.value.some((d) => d.id === savedDev)) {
@@ -539,8 +543,14 @@ async function submitBatchKdzs() {
     }
   }
 
-  const printer = readKdzsPrinterName()
+  await loadCloudKdzsPrinterName()
+  const printer = resolveKdzsPrinterName()
   kdzsPrinterName.value = printer
+  if (!printer) {
+    showFailToast('请先配置远程打印机名称')
+    await router.push('/kdzs-print')
+    return
+  }
   const platform = orderPlatformCode(orders[0])
   const timeRange = buildKdzsOrderTimeRange(orders)
   const payload: Record<string, unknown> = {
@@ -549,7 +559,7 @@ async function submitBatchKdzs() {
     platform,
     templateName: tpl.templateName || '',
     templateId: tpl.templateId,
-    printerName: printer || '',
+    printerName: printer,
     orders: buildHandoffOrders(orders),
     orderTimeFrom: timeRange?.from,
     orderTimeTo: timeRange?.to,

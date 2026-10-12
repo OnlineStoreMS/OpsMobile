@@ -506,8 +506,14 @@ import {
   saveSFOrderHandoff,
 } from '../utils/sfOrderHandoff'
 import { printShipmentByChannel } from '../utils/sfPrintLabel'
-import { getSavedPrinterIndex, getSavedPrinterName } from '../utils/sfPrintPlugin'
-import { readKdzsPrinterName } from '../utils/kdzsPrinter'
+import {
+  loadCloudSfPrinterName,
+  resolvePreferredPrinterIndex,
+} from '../utils/sfPrintPlugin'
+import {
+  loadCloudKdzsPrinterName,
+  resolveKdzsPrinterName,
+} from '../utils/kdzsPrinter'
 import { previewProductImage } from '../utils/previewProductImage'
 
 type ShipPickRow = ReturnType<typeof buildShipPickRows>[number]
@@ -556,7 +562,7 @@ const allKdzsTemplates = ref<ExpressTemplate[]>([])
 const kdzsDeviceId = ref<number | undefined>()
 const kdzsTemplateKey = ref('')
 const kdzsTemplateKeyword = ref('')
-const kdzsPrinterName = ref(readKdzsPrinterName())
+const kdzsPrinterName = ref(resolveKdzsPrinterName())
 
 const savedCompany = findExpressCompany(localStorage.getItem(EXPRESS_COMPANY_CODE_KEY) || '')
   || findExpressCompany(localStorage.getItem(EXPRESS_COMPANY_KEY) || '')
@@ -974,7 +980,11 @@ watch(expressCompanyCode, () => {
 })
 
 watch(shipMode, (mode) => {
-  if (mode === 'kdzs') kdzsPrinterName.value = readKdzsPrinterName()
+  if (mode === 'kdzs') {
+    void loadCloudKdzsPrinterName().then((n) => {
+      kdzsPrinterName.value = n
+    })
+  }
 })
 
 function pickCarrier(id: number) {
@@ -1124,7 +1134,8 @@ async function goQuick() {
   if (!order.value || !carrierAccountId.value || !shipperProfileId.value) return
   const snapshot = buildSnapshot()
   if (!snapshot) return
-  const printerIndex = getSavedPrinterIndex()
+  await loadCloudSfPrinterName()
+  const printerIndex = await resolvePreferredPrinterIndex()
   const carrier = carriers.value.find((c) => c.id === carrierAccountId.value)
   const channel = (carrier?.printChannel || 'plugin').toLowerCase()
   if (channel !== 'pdf' && printerIndex == null) {
@@ -1193,9 +1204,14 @@ async function goKdzsPrint() {
     showFailToast(`请选择${kdzsTemplateGroup.value}模板`)
     return
   }
-  const printer = readKdzsPrinterName()
+  await loadCloudKdzsPrinterName()
+  const printer = resolveKdzsPrinterName()
   kdzsPrinterName.value = printer
-  // 可不填：优先用 Agent 任务默认打印机；都空则用快递助手弹窗当前默认
+  if (!printer) {
+    showFailToast('请先配置远程打印机名称（快递助手远程打单设置）')
+    await router.push('/kdzs-print')
+    return
+  }
   // 手工单必须有快递助手系统编号/订单编号，否则无法精确勾选（会误打别的单）
   const plat = orderPlatformCode(order.value)
   const sysTid = (order.value.platformSysTid || '').trim()
@@ -1211,7 +1227,7 @@ async function goKdzsPrint() {
     platform: orderPlatformCode(order.value),
     templateName: tpl.templateName || '',
     templateId: tpl.templateId,
-    printerName: printer || '',
+    printerName: printer,
     orders: [
       {
         orderId: order.value.id,
@@ -1285,7 +1301,9 @@ async function submit() {
 }
 
 onMounted(async () => {
-  kdzsPrinterName.value = readKdzsPrinterName()
+  void loadCloudKdzsPrinterName().then((n) => {
+    kdzsPrinterName.value = n
+  })
   const id = Number(route.params.orderId)
   showLoadingToast({ message: '加载中…', forbidClick: true, duration: 0 })
   try {

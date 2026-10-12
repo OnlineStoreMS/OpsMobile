@@ -360,6 +360,8 @@ export async function ensureSCPPrintSDK(): Promise<void> {
   throw new Error('SCPPRINT_SDK_MISSING')
 }
 
+let cloudSfPrinterName = ''
+
 export function getSavedPrinterIndex(): number | null {
   const v = localStorage.getItem(PRINTER_STORAGE_KEY)
   if (v === null || v === '') return null
@@ -371,11 +373,64 @@ export function getSavedPrinterName(): string {
   return localStorage.getItem(PRINTER_NAME_STORAGE_KEY) || ''
 }
 
+export function getCloudSfPrinterName(): string {
+  return cloudSfPrinterName
+}
+
 export function savePrinterSelection(index: number, name?: string) {
   localStorage.setItem(PRINTER_STORAGE_KEY, String(index))
   if (name != null && name !== '') {
     localStorage.setItem(PRINTER_NAME_STORAGE_KEY, name)
   }
+}
+
+/** 发货中心配置的手机默认名，其次本机缓存 */
+export function preferSfPrinterName(): string {
+  return (cloudSfPrinterName || getSavedPrinterName() || '').trim()
+}
+
+/**
+ * 解析本机打印机：优先按发货中心/本机名称匹配列表；否则用本机 index；都没有则 null。
+ */
+export async function resolvePreferredPrinterIndex(
+  printers?: LocalPrinter[],
+): Promise<number | null> {
+  const list = printers ?? (await listLocalPrinters().catch(() => [] as LocalPrinter[]))
+  const preferName = preferSfPrinterName()
+  if (preferName) {
+    const byName = list.find((p) => p.name === preferName)
+    if (byName) {
+      savePrinterSelection(byName.index, byName.name)
+      return byName.index
+    }
+  }
+  const savedIdx = getSavedPrinterIndex()
+  if (savedIdx != null && list.some((p) => p.index === savedIdx)) {
+    return savedIdx
+  }
+  return null
+}
+
+/** 拉取发货中心配置的手机 SF 默认；有值则写入本机缓存以便页面自动带入 */
+export async function loadCloudSfPrinterName(): Promise<string> {
+  try {
+    const { shippingApi } = await import('../api/shipping')
+    const st = await shippingApi.getPrintSettings()
+    cloudSfPrinterName = (st.sfPrinterName || '').trim()
+    if (cloudSfPrinterName) {
+      localStorage.setItem(PRINTER_NAME_STORAGE_KEY, cloudSfPrinterName)
+    }
+  } catch {
+    /* ignore */
+  }
+  return preferSfPrinterName()
+}
+
+export async function saveSfPrinterToCloud(name: string): Promise<void> {
+  const v = String(name || '').trim()
+  const { shippingApi } = await import('../api/shipping')
+  await shippingApi.updatePrintSettings({ sfPrinterName: v })
+  cloudSfPrinterName = v
 }
 
 /** 条码标签上次选用的打印机（与面单默认机分开记） */

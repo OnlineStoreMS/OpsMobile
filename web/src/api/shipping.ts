@@ -459,6 +459,17 @@ export const shippingApi = {
     shippingClient.get('/kdzs-print/tasks').then((r) =>
       unwrap<{ list: KdzsPrintTask[]; total: number }>(r),
     ),
+
+  getPrintSettings: () =>
+    shippingClient.get('/print-settings').then((r) => unwrap<PrintSettings>(r)),
+  updatePrintSettings: (body: Partial<PrintSettings>) =>
+    shippingClient.put('/print-settings', body).then((r) => unwrap<PrintSettings>(r)),
+}
+
+/** 租户级默认打印机（自建物流 + 快递助手远程） */
+export interface PrintSettings {
+  sfPrinterName: string
+  kdzsPrinterName: string
 }
 
 export interface ExpressTemplate {

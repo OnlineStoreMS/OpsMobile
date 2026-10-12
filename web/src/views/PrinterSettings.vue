@@ -45,7 +45,13 @@
 
       <div class="section-label">默认打印机</div>
       <div class="card">
-        <div v-if="savedName" class="muted current">当前默认：{{ savedName }}</div>
+        <div class="muted tip tip--sm">
+          发货中心「默认打印机」配置后自动带入；也可在下方重选。
+        </div>
+        <div v-if="savedName || cloudSfName" class="muted current">
+          当前默认：{{ cloudSfName || savedName }}
+          <template v-if="cloudSfName"> · 来自发货中心</template>
+        </div>
         <van-loading v-if="loading" size="24px" vertical>读取打印机…</van-loading>
         <template v-else>
           <button
@@ -86,14 +92,19 @@ import {
   ensureLocalPrintService,
   getClodopProxyBase,
   getClodopServiceBase,
+  getCloudSfPrinterName,
   getSavedPrinterIndex,
   getSavedPrinterName,
   isSecureAppContext,
   listLocalPrinters,
+  loadCloudSfPrinterName,
   normalizeClodopServiceBase,
+  preferSfPrinterName,
   resolveClodopLoadBase,
+  resolvePreferredPrinterIndex,
   saveClodopServiceBase,
   savePrinterSelection,
+  saveSfPrinterToCloud,
   testPrintLocalPrinter,
   type LocalPrinter,
 } from '../utils/sfPrintPlugin'
@@ -109,6 +120,7 @@ const serviceEndpoint = ref('')
 const printers = ref<LocalPrinter[]>([])
 const selected = ref<number | null>(getSavedPrinterIndex())
 const savedName = ref(getSavedPrinterName())
+const cloudSfName = ref('')
 const secure = computed(() => isSecureAppContext())
 const proxyBase = computed(() => getClodopProxyBase())
 
@@ -134,16 +146,17 @@ async function refresh() {
     ;(window as any).LODOP = undefined
     ;(window as any).CLODOP = undefined
 
+    await loadCloudSfPrinterName()
+    cloudSfName.value = getCloudSfPrinterName()
+    savedName.value = preferSfPrinterName()
+
     await probeService()
     if (!serviceOk.value) {
       printers.value = []
       return
     }
     printers.value = await listLocalPrinters()
-    if (selected.value != null && !printers.value.some((p) => p.index === selected.value)) {
-      const byName = printers.value.find((p) => p.name === savedName.value)
-      selected.value = byName?.index ?? printers.value[0]?.index ?? null
-    }
+    selected.value = await resolvePreferredPrinterIndex(printers.value)
     if (selected.value == null && printers.value.length === 1) {
       selected.value = printers.value[0].index
       savePrinterSelection(printers.value[0].index, printers.value[0].name)
@@ -179,11 +192,17 @@ function clearHost() {
   showSuccessToast('已清除')
 }
 
-function choose(p: LocalPrinter) {
+async function choose(p: LocalPrinter) {
   selected.value = p.index
   savePrinterSelection(p.index, p.name)
   savedName.value = p.name
-  showSuccessToast(`已选择：${p.name}`)
+  try {
+    await saveSfPrinterToCloud(p.name)
+    cloudSfName.value = p.name
+    showSuccessToast(`已选择：${p.name}`)
+  } catch (e) {
+    showFailToast((e as Error).message || '同步发货中心失败，本机已保存')
+  }
 }
 
 async function runTest() {
