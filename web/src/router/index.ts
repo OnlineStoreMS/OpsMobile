@@ -246,7 +246,7 @@ const router = createRouter({
       path: '/material/materials',
       name: 'MaterialList',
       component: () => import('../views/material/MaterialList.vue'),
-      meta: { title: '全部素材', hideTabbar: true },
+      meta: { title: '素材库', hideTabbar: true },
     },
     {
       path: '/material/materials/:id',

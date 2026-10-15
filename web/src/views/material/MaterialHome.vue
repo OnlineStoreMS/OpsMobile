@@ -58,8 +58,8 @@ const sections = [
       },
       {
         path: '/material/materials',
-        title: '全部素材',
-        desc: '浏览 · 搜索',
+        title: '素材库',
+        desc: '分类视图 · 子菜单',
         icon: 'photo-o',
         gradient: 'linear-gradient(145deg, #92400e, #d97706)',
         glow: 'rgba(217, 119, 6, 0.28)',
@@ -67,7 +67,7 @@ const sections = [
       {
         path: '/material/materials?mediaType=image',
         title: '图片',
-        desc: '仅图片素材',
+        desc: '分类筛选图片',
         icon: 'photograph',
         gradient: 'linear-gradient(145deg, #0369a1, #0ea5e9)',
         glow: 'rgba(14, 165, 233, 0.28)',
@@ -75,7 +75,7 @@ const sections = [
       {
         path: '/material/materials?mediaType=video',
         title: '视频',
-        desc: '仅视频素材',
+        desc: '分类筛选视频',
         icon: 'video-o',
         gradient: 'linear-gradient(145deg, #6d28d9, #8b5cf6)',
         glow: 'rgba(139, 92, 246, 0.26)',
