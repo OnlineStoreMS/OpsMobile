@@ -85,38 +85,39 @@
             </div>
           </div>
 
-          <div class="mat-main__body" :class="{ 'is-switching': switching }">
+          <div class="mat-main__body">
             <div v-if="switching" class="switch-mask">
-              <van-loading size="22px" vertical>加载中</van-loading>
+              <van-loading size="20px" />
             </div>
-
-            <van-list
-              v-model:loading="loading"
-              :finished="finished"
-              :immediate-check="false"
-              finished-text="没有更多了"
-              @load="loadMore"
-            >
-              <div class="mat-grid">
-                <div
-                  v-for="row in list"
-                  :key="row.id"
-                  class="mat-card"
-                  @click="router.push(`/material/materials/${row.id}`)"
-                >
-                  <div class="mat-thumb">
-                    <img v-if="thumb(row)" :src="thumb(row)" alt="" loading="lazy" decoding="async" />
-                    <div v-else class="mat-thumb__empty">
-                      {{ row.mediaType === 'video' ? '视频' : '无图' }}
+            <div class="mat-grid-wrap" :class="{ 'is-switching': switching }">
+              <van-list
+                v-model:loading="loading"
+                :finished="finished"
+                :immediate-check="false"
+                finished-text="没有更多了"
+                @load="loadMore"
+              >
+                <div class="mat-grid">
+                  <div
+                    v-for="row in list"
+                    :key="row.id"
+                    class="mat-card"
+                    @click="router.push(`/material/materials/${row.id}`)"
+                  >
+                    <div class="mat-thumb">
+                      <img v-if="thumb(row)" :src="thumb(row)" alt="" loading="lazy" decoding="async" />
+                      <div v-else class="mat-thumb__empty">
+                        {{ row.mediaType === 'video' ? '视频' : '无图' }}
+                      </div>
+                      <van-tag v-if="row.mediaType === 'video'" class="mat-badge" type="primary">视频</van-tag>
                     </div>
-                    <van-tag v-if="row.mediaType === 'video'" class="mat-badge" type="primary">视频</van-tag>
+                    <div class="mat-title">{{ row.title || row.fileName || '未命名' }}</div>
+                    <div class="muted mat-meta">{{ row.productSn || '' }}</div>
                   </div>
-                  <div class="mat-title">{{ row.title || row.fileName || '未命名' }}</div>
-                  <div class="muted mat-meta">{{ row.productSn || '' }}</div>
                 </div>
-              </div>
-              <van-empty v-if="!loading && !switching && !list.length" description="该分类暂无素材" />
-            </van-list>
+                <van-empty v-if="!loading && !switching && !list.length" description="该分类暂无素材" />
+              </van-list>
+            </div>
           </div>
         </div>
       </div>
@@ -459,15 +460,19 @@ onMounted(async () => {
   position: relative;
   flex: 1;
   min-height: 120px;
-  transition: opacity 0.15s ease;
 }
-.mat-main__body.is-switching {
-  opacity: 0.45;
+.mat-grid-wrap {
+  transition: opacity 0.12s ease;
+}
+.mat-grid-wrap.is-switching {
+  opacity: 0.35;
   pointer-events: none;
 }
 .switch-mask {
   position: absolute;
-  inset: 24px 0 auto;
+  left: 0;
+  right: 0;
+  top: 36px;
   z-index: 2;
   display: flex;
   justify-content: center;
@@ -514,12 +519,12 @@ onMounted(async () => {
   padding-bottom: 10px;
   margin-bottom: 4px;
   scrollbar-width: none;
-  min-height: 36px;
+  /* 固定占位，有无子分类时不挤动下方图片区 */
+  min-height: 42px;
 }
 .submenu--empty {
-  min-height: 0;
-  padding-bottom: 0;
-  margin-bottom: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 .submenu::-webkit-scrollbar {
   display: none;

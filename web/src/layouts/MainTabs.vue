@@ -39,7 +39,8 @@
           @after-enter="onSlideUnlock"
           @after-leave="onSlideUnlock"
         >
-          <component :is="Component" :key="r.fullPath" />
+          <!-- 用 path 而非 fullPath：query 变化（如素材分类）只做局部刷新，避免整页重建+滑入 -->
+          <component :is="Component" :key="r.path" />
         </transition>
       </router-view>
     </div>
@@ -141,6 +142,12 @@ router.beforeEach((to, from) => {
   const fromHub = Boolean(from.meta.hub)
 
   if (!from.name || (toHub && fromHub)) {
+    transitionName.value = 'fade-tab'
+    return
+  }
+
+  // 同 path 仅改 query（如素材库切分类）：不要左右滑整页动画
+  if (to.path === from.path) {
     transitionName.value = 'fade-tab'
     return
   }
