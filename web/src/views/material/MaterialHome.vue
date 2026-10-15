@@ -49,12 +49,20 @@ const sections = [
     title: '素材库',
     items: [
       {
+        path: '/material/upload',
+        title: '上传素材',
+        desc: '拍照 · 相册入库',
+        icon: 'plus',
+        gradient: 'linear-gradient(145deg, #b45309, #f59e0b)',
+        glow: 'rgba(245, 158, 11, 0.28)',
+      },
+      {
         path: '/material/materials',
         title: '全部素材',
         desc: '浏览 · 搜索',
         icon: 'photo-o',
-        gradient: 'linear-gradient(145deg, #b45309, #f59e0b)',
-        glow: 'rgba(245, 158, 11, 0.28)',
+        gradient: 'linear-gradient(145deg, #92400e, #d97706)',
+        glow: 'rgba(217, 119, 6, 0.28)',
       },
       {
         path: '/material/materials?mediaType=image',
@@ -79,8 +87,8 @@ const sections = [
     items: [
       {
         path: '/material/categories',
-        title: '素材分类',
-        desc: '分类树速览',
+        title: '分类管理',
+        desc: '新建 · 编辑 · 删除',
         icon: 'cluster-o',
         gradient: 'linear-gradient(145deg, #0f766e, #14b8a6)',
         glow: 'rgba(20, 184, 166, 0.28)',

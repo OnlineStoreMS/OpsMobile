@@ -1,6 +1,20 @@
 <template>
   <div class="page">
-    <van-nav-bar class="ops-nav" :title="navTitle" left-arrow @click-left="router.back()" />
+    <van-nav-bar class="ops-nav" :title="navTitle" left-arrow @click-left="router.back()">
+      <template #right>
+        <span
+          class="nav-link"
+          @click="
+            router.push({
+              path: '/material/upload',
+              query: categoryId ? { categoryId: String(categoryId) } : {},
+            })
+          "
+        >
+          上传
+        </span>
+      </template>
+    </van-nav-bar>
     <div class="list-shell">
       <van-search v-model="keyword" shape="round" placeholder="标题 / 货号 / 标签" show-action @search="reload">
         <template #action>

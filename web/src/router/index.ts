@@ -237,6 +237,12 @@ const router = createRouter({
 
     // —— 素材中心子页 ——
     {
+      path: '/material/upload',
+      name: 'MaterialUpload',
+      component: () => import('../views/material/MaterialUpload.vue'),
+      meta: { title: '上传素材', hideTabbar: true },
+    },
+    {
       path: '/material/materials',
       name: 'MaterialList',
       component: () => import('../views/material/MaterialList.vue'),
@@ -252,7 +258,7 @@ const router = createRouter({
       path: '/material/categories',
       name: 'MaterialCategories',
       component: () => import('../views/material/CategoryList.vue'),
-      meta: { title: '素材分类', hideTabbar: true },
+      meta: { title: '分类管理', hideTabbar: true },
     },
 
     // —— 待办中心子页 ——
