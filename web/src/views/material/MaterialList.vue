@@ -105,7 +105,7 @@
                   @click="router.push(`/material/materials/${row.id}`)"
                 >
                   <div class="mat-thumb">
-                    <img v-if="thumb(row)" :src="thumb(row)" alt="" />
+                    <img v-if="thumb(row)" :src="thumb(row)" alt="" loading="lazy" decoding="async" />
                     <div v-else class="mat-thumb__empty">
                       {{ row.mediaType === 'video' ? '视频' : '无图' }}
                     </div>
@@ -128,7 +128,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
-import { materialApi, materialAssetUrl } from '../../api/material'
+import { materialApi, materialListSrc } from '../../api/material'
 
 type CatNode = {
   id: number
@@ -265,7 +265,35 @@ function onBack() {
 }
 
 function thumb(row: any) {
-  return materialAssetUrl(row.coverUrl || (row.mediaType === 'image' ? row.url : '') || '')
+  return materialListSrc(row)
+}
+
+async function ensureThumbsForPage(rows: any[]) {
+  const need = (rows || [])
+    .filter((m) => m.mediaType === 'image' && !m.thumbUrl)
+    .map((m: any) => m.id as number)
+  if (!need.length) return
+  try {
+    const r = await materialApi.ensureThumbs(need)
+    if (r.ok > 0) {
+      // 软刷新当前第一页缩略图
+      const res = await materialApi.listMaterials({
+        keyword: keyword.value.trim() || undefined,
+        mediaType: mediaType.value || undefined,
+        categoryId: selectedId.value || undefined,
+        includeChildren: selectedId.value ? true : undefined,
+        page: 1,
+        pageSize: Math.max(list.value.length, 24),
+      })
+      const fresh = res.list || []
+      if (fresh.length) {
+        const map = new Map(fresh.map((x: any) => [x.id, x]))
+        list.value = list.value.map((x) => map.get(x.id) || x)
+      }
+    }
+  } catch {
+    // ignore
+  }
 }
 
 async function loadCategories() {
@@ -306,6 +334,7 @@ async function softReload() {
     else page.value = 2
     await nextTick()
     if (mainEl.value) mainEl.value.scrollTop = 0
+    void ensureThumbsForPage(list.value)
   } catch (e: any) {
     if (seq !== loadSeq) return
     finished.value = true
@@ -329,6 +358,7 @@ async function loadMore() {
     list.value = page.value === 1 ? rows : list.value.concat(rows)
     if (rows.length < 24) finished.value = true
     else page.value += 1
+    void ensureThumbsForPage(rows)
   } catch (e: any) {
     if (seq !== loadSeq) return
     finished.value = true

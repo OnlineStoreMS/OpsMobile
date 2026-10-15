@@ -21,6 +21,17 @@ export function materialAssetUrl(url?: string) {
   return `/apps/material/${url}`
 }
 
+/** 列表小图：优先缩略图 */
+export function materialListSrc(m: {
+  mediaType?: string
+  thumbUrl?: string
+  coverUrl?: string
+  url?: string
+}) {
+  if (m.mediaType === 'video') return materialAssetUrl(m.coverUrl || '')
+  return materialAssetUrl(m.thumbUrl || m.coverUrl || m.url || '')
+}
+
 function guessMediaType(file: File, url?: string): MediaType {
   if (file.type.startsWith('video/')) return 'video'
   if (file.type.startsWith('image/')) return 'image'
@@ -79,5 +90,9 @@ export const materialApi = {
     await materialClient.delete(`/categories/${id}`)
   },
   stats: async () => unwrap<any>(await materialClient.get('/dashboard/stats')),
+  ensureThumbs: async (ids: number[]) =>
+    unwrap<{ ok: number; fail: number }>(
+      await materialClient.post('/materials/ensure-thumbs', { ids }, { timeout: 300000 }),
+    ),
   uploadMedia: uploadMaterialMedia,
 }
