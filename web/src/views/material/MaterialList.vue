@@ -1,15 +1,15 @@
 <template>
   <div class="page mat-page">
-    <van-nav-bar class="ops-nav" :title="navTitle" left-arrow @click-left="onBack">
+    <van-nav-bar class="ops-nav" title="素材库" left-arrow @click-left="onBack">
       <template #right>
         <span class="nav-link" @click="goUpload">上传</span>
       </template>
     </van-nav-bar>
 
     <div class="list-shell mat-shell">
-      <van-search v-model="keyword" shape="round" placeholder="标题 / 货号 / 标签" show-action @search="reload">
+      <van-search v-model="keyword" shape="round" placeholder="标题 / 货号 / 标签" show-action @search="softReload">
         <template #action>
-          <div class="search-action" @click="reload">搜索</div>
+          <div class="search-action" @click="softReload">搜索</div>
         </template>
       </van-search>
 
@@ -42,70 +42,82 @@
           </button>
         </aside>
 
-        <div class="mat-main">
-          <div v-if="breadcrumb.length" class="crumb">
-            <button type="button" class="crumb__link" @click="selectCategory(0)">全部</button>
-            <template v-for="(b, i) in breadcrumb" :key="b.id">
-              <van-icon name="arrow" class="crumb__sep" />
-              <button
-                type="button"
-                class="crumb__link"
-                :class="{ 'crumb__link--cur': i === breadcrumb.length - 1 }"
-                @click="selectCategory(b.id)"
-              >
-                {{ b.name }}
-              </button>
-            </template>
-          </div>
-
-          <div v-if="submenu.length" class="submenu">
-            <button
-              type="button"
-              class="submenu__chip"
-              :class="{ 'submenu__chip--on': submenuAllActive }"
-              @click="selectCategory(submenuParentId)"
-            >
-              全部
-            </button>
-            <button
-              v-for="c in submenu"
-              :key="c.id"
-              type="button"
-              class="submenu__chip"
-              :class="{ 'submenu__chip--on': selectedId === c.id || isDescendantSelected(c) }"
-              @click="selectCategory(c.id)"
-            >
-              {{ c.name }}
-              <van-icon v-if="c.children?.length" name="arrow" class="submenu__more" />
-            </button>
-          </div>
-
-          <van-list
-            v-model:loading="loading"
-            :finished="finished"
-            finished-text="没有更多了"
-            @load="loadMore"
-          >
-            <div class="mat-grid">
-              <div
-                v-for="row in list"
-                :key="row.id"
-                class="mat-card"
-                @click="router.push(`/material/materials/${row.id}`)"
-              >
-                <div class="mat-thumb">
-                  <img v-if="thumb(row)" :src="thumb(row)" alt="" />
-                  <div v-else class="mat-thumb__empty">
-                    {{ row.mediaType === 'video' ? '视频' : '无图' }}
-                  </div>
-                  <van-tag v-if="row.mediaType === 'video'" class="mat-badge" type="primary">视频</van-tag>
-                </div>
-                <div class="mat-title">{{ row.title || row.fileName || '未命名' }}</div>
-                <div class="muted mat-meta">{{ row.productSn || '' }}</div>
-              </div>
+        <div class="mat-main" ref="mainEl">
+          <div class="mat-main__head">
+            <div v-if="breadcrumb.length" class="crumb">
+              <button type="button" class="crumb__link" @click="selectCategory(0)">全部</button>
+              <template v-for="(b, i) in breadcrumb" :key="b.id">
+                <van-icon name="arrow" class="crumb__sep" />
+                <button
+                  type="button"
+                  class="crumb__link"
+                  :class="{ 'crumb__link--cur': i === breadcrumb.length - 1 }"
+                  @click="selectCategory(b.id)"
+                >
+                  {{ b.name }}
+                </button>
+              </template>
             </div>
-            <van-empty v-if="!loading && !list.length" description="该分类暂无素材" />
-          </van-list>
+            <div v-else class="crumb crumb--muted">{{ headHint }}</div>
+
+            <div class="submenu" :class="{ 'submenu--empty': !submenu.length }">
+              <template v-if="submenu.length">
+                <button
+                  type="button"
+                  class="submenu__chip"
+                  :class="{ 'submenu__chip--on': submenuAllActive }"
+                  @click="selectCategory(submenuParentId)"
+                >
+                  全部
+                </button>
+                <button
+                  v-for="c in submenu"
+                  :key="c.id"
+                  type="button"
+                  class="submenu__chip"
+                  :class="{ 'submenu__chip--on': selectedId === c.id || isDescendantSelected(c) }"
+                  @click="selectCategory(c.id)"
+                >
+                  {{ c.name }}
+                  <van-icon v-if="c.children?.length" name="arrow" class="submenu__more" />
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <div class="mat-main__body" :class="{ 'is-switching': switching }">
+            <div v-if="switching" class="switch-mask">
+              <van-loading size="22px" vertical>加载中</van-loading>
+            </div>
+
+            <van-list
+              v-model:loading="loading"
+              :finished="finished"
+              :immediate-check="false"
+              finished-text="没有更多了"
+              @load="loadMore"
+            >
+              <div class="mat-grid">
+                <div
+                  v-for="row in list"
+                  :key="row.id"
+                  class="mat-card"
+                  @click="router.push(`/material/materials/${row.id}`)"
+                >
+                  <div class="mat-thumb">
+                    <img v-if="thumb(row)" :src="thumb(row)" alt="" />
+                    <div v-else class="mat-thumb__empty">
+                      {{ row.mediaType === 'video' ? '视频' : '无图' }}
+                    </div>
+                    <van-tag v-if="row.mediaType === 'video'" class="mat-badge" type="primary">视频</van-tag>
+                  </div>
+                  <div class="mat-title">{{ row.title || row.fileName || '未命名' }}</div>
+                  <div class="muted mat-meta">{{ row.productSn || '' }}</div>
+                </div>
+              </div>
+              <van-empty v-if="!loading && !switching && !list.length" description="该分类暂无素材" />
+            </van-list>
+          </div>
         </div>
       </div>
     </div>
@@ -113,7 +125,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
 import { materialApi, materialAssetUrl } from '../../api/material'
@@ -130,26 +142,19 @@ const route = useRoute()
 const keyword = ref('')
 const list = ref<any[]>([])
 const loading = ref(false)
+const switching = ref(false)
 const finished = ref(false)
 const page = ref(1)
 const tree = ref<CatNode[]>([])
 const byId = ref<Map<number, CatNode>>(new Map())
 const parentOf = ref<Map<number, number>>(new Map())
-
-const mediaType = computed(() => {
-  const v = route.query.mediaType
-  return typeof v === 'string' && v ? v : ''
-})
-
-const selectedId = computed(() => {
-  const v = route.query.categoryId
-  if (typeof v !== 'string' || !v) return 0
-  const n = Number(v)
-  return Number.isFinite(n) && n > 0 ? n : 0
-})
+const mainEl = ref<HTMLElement | null>(null)
+/** 本地分类状态，避免每次切分类整页跟着路由闪 */
+const selectedId = ref(0)
+const mediaType = ref('')
+let loadSeq = 0
 
 const rootCategories = computed(() => tree.value)
-
 const selectedNode = computed(() => (selectedId.value ? byId.value.get(selectedId.value) : undefined))
 
 const breadcrumb = computed(() => {
@@ -167,7 +172,6 @@ const breadcrumb = computed(() => {
   return chain
 })
 
-/** 当前应展示的子菜单：选中节点自身有子级 → 其子级；否则展示父级的子级 */
 const submenuParentId = computed(() => {
   const node = selectedNode.value
   if (!node) return 0
@@ -186,11 +190,10 @@ const submenuAllActive = computed(() => {
   return selectedId.value === submenuParentId.value
 })
 
-const navTitle = computed(() => {
-  if (selectedNode.value) return selectedNode.value.name
-  if (mediaType.value === 'image') return '图片素材'
-  if (mediaType.value === 'video') return '视频素材'
-  return '素材库'
+const headHint = computed(() => {
+  if (mediaType.value === 'image') return '全部图片'
+  if (mediaType.value === 'video') return '全部视频'
+  return '全部分类'
 })
 
 function indexTree(nodes: CatNode[], parentId = 0) {
@@ -219,17 +222,30 @@ function isDescendantSelected(c: CatNode) {
   return isUnder(c, selectedId.value)
 }
 
-function selectCategory(id: number) {
+/** 静默同步 URL，不依赖 watch 触发重载，避免整页感 */
+function syncQuery() {
   const query: Record<string, string> = {}
   if (mediaType.value) query.mediaType = mediaType.value
-  if (id > 0) query.categoryId = String(id)
-  router.replace({ path: '/material/materials', query })
+  if (selectedId.value > 0) query.categoryId = String(selectedId.value)
+  const cur = route.query
+  const same =
+    String(cur.mediaType || '') === String(query.mediaType || '') &&
+    String(cur.categoryId || '') === String(query.categoryId || '')
+  if (same) return
+  router.replace({ path: '/material/materials', query }).catch(() => {})
+}
+
+function selectCategory(id: number) {
+  if (id === selectedId.value) return
+  selectedId.value = id
+  syncQuery()
+  void softReload()
 }
 
 function clearMediaType() {
-  const query: Record<string, string> = {}
-  if (selectedId.value) query.categoryId = String(selectedId.value)
-  router.replace({ path: '/material/materials', query })
+  mediaType.value = ''
+  syncQuery()
+  void softReload()
 }
 
 function goUpload() {
@@ -264,43 +280,74 @@ async function loadCategories() {
   }
 }
 
+async function fetchPage(pageNo: number) {
+  return materialApi.listMaterials({
+    keyword: keyword.value.trim() || undefined,
+    mediaType: mediaType.value || undefined,
+    categoryId: selectedId.value || undefined,
+    includeChildren: selectedId.value ? true : undefined,
+    page: pageNo,
+    pageSize: 24,
+  })
+}
+
+/** 切分类：保留旧列表，仅右侧淡出换新，不整页空白闪一下 */
+async function softReload() {
+  const seq = ++loadSeq
+  switching.value = true
+  page.value = 1
+  finished.value = false
+  loading.value = false
+  try {
+    const res = await fetchPage(1)
+    if (seq !== loadSeq) return
+    list.value = res.list || []
+    if ((res.list || []).length < 24) finished.value = true
+    else page.value = 2
+    await nextTick()
+    if (mainEl.value) mainEl.value.scrollTop = 0
+  } catch (e: any) {
+    if (seq !== loadSeq) return
+    finished.value = true
+    showFailToast(e.message || '加载失败')
+  } finally {
+    if (seq === loadSeq) switching.value = false
+  }
+}
+
 async function loadMore() {
+  if (switching.value) {
+    loading.value = false
+    return
+  }
+  const seq = loadSeq
   loading.value = true
   try {
-    const res = await materialApi.listMaterials({
-      keyword: keyword.value.trim() || undefined,
-      mediaType: mediaType.value || undefined,
-      categoryId: selectedId.value || undefined,
-      includeChildren: selectedId.value ? true : undefined,
-      page: page.value,
-      pageSize: 24,
-    })
+    const res = await fetchPage(page.value)
+    if (seq !== loadSeq) return
     const rows = res.list || []
     list.value = page.value === 1 ? rows : list.value.concat(rows)
     if (rows.length < 24) finished.value = true
     else page.value += 1
   } catch (e: any) {
+    if (seq !== loadSeq) return
     finished.value = true
     showFailToast(e.message || '加载失败')
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
-function reload() {
-  page.value = 1
-  finished.value = false
-  list.value = []
-  void loadMore()
-}
-
-watch(
-  () => [route.query.mediaType, route.query.categoryId],
-  () => reload(),
-)
-
 onMounted(async () => {
+  const mt = route.query.mediaType
+  mediaType.value = typeof mt === 'string' && mt ? mt : ''
+  const cid = route.query.categoryId
+  if (typeof cid === 'string' && cid) {
+    const n = Number(cid)
+    if (Number.isFinite(n) && n > 0) selectedId.value = n
+  }
   await loadCategories()
+  await softReload()
 })
 </script>
 
@@ -372,6 +419,29 @@ onMounted(async () => {
   -webkit-overflow-scrolling: touch;
   padding: 8px 10px calc(16px + var(--ops-safe-bottom));
   background: transparent;
+  display: flex;
+  flex-direction: column;
+}
+.mat-main__head {
+  flex-shrink: 0;
+}
+.mat-main__body {
+  position: relative;
+  flex: 1;
+  min-height: 120px;
+  transition: opacity 0.15s ease;
+}
+.mat-main__body.is-switching {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.switch-mask {
+  position: absolute;
+  inset: 24px 0 auto;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
 }
 .crumb {
   display: flex;
@@ -380,6 +450,10 @@ onMounted(async () => {
   gap: 2px;
   margin-bottom: 8px;
   font-size: 12px;
+  min-height: 18px;
+}
+.crumb--muted {
+  color: var(--ops-muted);
 }
 .crumb__link {
   border: 0;
@@ -410,6 +484,12 @@ onMounted(async () => {
   padding-bottom: 10px;
   margin-bottom: 4px;
   scrollbar-width: none;
+  min-height: 36px;
+}
+.submenu--empty {
+  min-height: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
 }
 .submenu::-webkit-scrollbar {
   display: none;
