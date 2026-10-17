@@ -116,6 +116,7 @@ import {
 } from '../../api/supply'
 import {
   buildMultiOrderCopyText,
+  buildTrackingBySoId,
   canDecryptOrder,
   isMaskedReceiver,
 } from '../../utils/supplyOrderCopy'
@@ -280,7 +281,17 @@ async function copyRow(row: PurchaseOrderListItem) {
       const byId = new Map((data.items || []).map((o) => [o.id, o]))
       orders = orders.map((o) => byId.get(o.id) || o)
     }
-    const text = buildMultiOrderCopyText(orders)
+    let trackingBySoId: Record<number, string> = {}
+    try {
+      const [detail, ships] = await Promise.all([
+        supplyApi.getPurchaseOrder(row.id),
+        supplyApi.listShipments(row.id),
+      ])
+      trackingBySoId = buildTrackingBySoId(detail.items || [], ships)
+    } catch {
+      /* ignore */
+    }
+    const text = buildMultiOrderCopyText(orders, new Date(), trackingBySoId)
     if (!text.trim()) {
       showFailToast('暂无收件信息可复制')
       return
