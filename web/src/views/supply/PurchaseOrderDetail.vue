@@ -245,6 +245,7 @@ import {
   buildMultiOrderCopyText,
   buildTrackingBySoId,
   canDecryptOrder,
+  collectActiveRefSoIds,
   isMaskedReceiver,
 } from '../../utils/supplyOrderCopy'
 import { copyTextForUser } from '../../utils/copyFallback'
@@ -459,14 +460,19 @@ async function loadAll() {
   }
 }
 
-async function collectLinkedOrders() {
+async function collectLinkedOrders(activeOnly = false) {
   if (!detail.value) throw new Error('未加载')
-  const ids = new Set<number>()
-  if (detail.value.refSoId && detail.value.refSoId > 0) ids.add(detail.value.refSoId)
-  for (const it of detail.value.items || []) {
-    if (it.refSoId && it.refSoId > 0) ids.add(it.refSoId)
-  }
-  if (!ids.size) throw new Error('未关联销售订单')
+  const ids = activeOnly
+    ? collectActiveRefSoIds(detail.value)
+    : (() => {
+        const set = new Set<number>()
+        if (detail.value!.refSoId && detail.value!.refSoId > 0) set.add(detail.value!.refSoId)
+        for (const it of detail.value!.items || []) {
+          if (it.refSoId && it.refSoId > 0) set.add(it.refSoId)
+        }
+        return [...set]
+      })()
+  if (!ids.length) throw new Error(activeOnly ? '没有可复制的有效销售单（已撤回不算）' : '未关联销售订单')
   const orders = []
   for (const id of ids) orders.push(await supplyApi.fetchOrder(id))
   return orders
@@ -493,7 +499,7 @@ async function handleDecrypt() {
 async function handleCopy() {
   copying.value = true
   try {
-    let orders = await collectLinkedOrders()
+    let orders = await collectLinkedOrders(true)
     const need = orders.filter((o) => canDecryptOrder(o) && isMaskedReceiver(o))
     if (need.length) {
       const data = await supplyApi.decryptOrders(need.map((o) => o.id))
@@ -505,7 +511,10 @@ async function handleCopy() {
       const ships = shipments.value.length
         ? shipments.value
         : await supplyApi.listShipments(detail.value!.id)
-      trackingBySoId = buildTrackingBySoId(detail.value?.items || [], ships)
+      trackingBySoId = buildTrackingBySoId(
+        (detail.value?.items || []).filter((it) => !it.cancelled),
+        ships,
+      )
     } catch {
       /* ignore */
     }

@@ -118,6 +118,7 @@ import {
   buildMultiOrderCopyText,
   buildTrackingBySoId,
   canDecryptOrder,
+  collectActiveRefSoIds,
   isMaskedReceiver,
 } from '../../utils/supplyOrderCopy'
 import { copyTextForUser } from '../../utils/copyFallback'
@@ -242,24 +243,29 @@ function onCardClick(row: PurchaseOrderListItem) {
   router.push(`/supply/purchase-orders/${row.id}`)
 }
 
-async function loadLinkedOrders(poId: number) {
+async function loadLinkedOrders(poId: number, activeOnly = false) {
   const po = await supplyApi.getPurchaseOrder(poId)
-  const ids = new Set<number>()
-  if (po.refSoId && po.refSoId > 0) ids.add(po.refSoId)
-  for (const it of po.items || []) {
-    if (it.refSoId && it.refSoId > 0) ids.add(it.refSoId)
-  }
-  if (!ids.size) throw new Error('未关联销售订单')
+  const ids = activeOnly
+    ? collectActiveRefSoIds(po)
+    : (() => {
+        const set = new Set<number>()
+        if (po.refSoId && po.refSoId > 0) set.add(po.refSoId)
+        for (const it of po.items || []) {
+          if (it.refSoId && it.refSoId > 0) set.add(it.refSoId)
+        }
+        return [...set]
+      })()
+  if (!ids.length) throw new Error(activeOnly ? '没有可复制的有效销售单（已撤回不算）' : '未关联销售订单')
   const orders = []
   for (const id of ids) {
     orders.push(await supplyApi.fetchOrder(id))
   }
-  return orders
+  return { orders, po }
 }
 
 async function decryptRow(row: PurchaseOrderListItem) {
   try {
-    const orders = await loadLinkedOrders(row.id)
+    const { orders } = await loadLinkedOrders(row.id)
     const ecommerce = orders.filter((o) => canDecryptOrder(o))
     if (!ecommerce.length) {
       showFailToast('无可解密的电商订单')
@@ -274,7 +280,8 @@ async function decryptRow(row: PurchaseOrderListItem) {
 
 async function copyRow(row: PurchaseOrderListItem) {
   try {
-    let orders = await loadLinkedOrders(row.id)
+    const loaded = await loadLinkedOrders(row.id, true)
+    let orders = loaded.orders
     const need = orders.filter((o) => canDecryptOrder(o) && isMaskedReceiver(o))
     if (need.length) {
       const data = await supplyApi.decryptOrders(need.map((o) => o.id))
@@ -283,11 +290,11 @@ async function copyRow(row: PurchaseOrderListItem) {
     }
     let trackingBySoId: Record<number, string> = {}
     try {
-      const [detail, ships] = await Promise.all([
-        supplyApi.getPurchaseOrder(row.id),
-        supplyApi.listShipments(row.id),
-      ])
-      trackingBySoId = buildTrackingBySoId(detail.items || [], ships)
+      const ships = await supplyApi.listShipments(row.id)
+      trackingBySoId = buildTrackingBySoId(
+        (loaded.po.items || []).filter((it: { cancelled?: boolean }) => !it.cancelled),
+        ships,
+      )
     } catch {
       /* ignore */
     }
