@@ -246,7 +246,6 @@ import {
   buildTrackingBySoId,
   canDecryptOrder,
   collectActiveRefSoIds,
-  isMaskedReceiver,
 } from '../../utils/supplyOrderCopy'
 import { copyTextForUser } from '../../utils/copyFallback'
 import { previewProductImage } from '../../utils/previewProductImage'
@@ -499,13 +498,7 @@ async function handleDecrypt() {
 async function handleCopy() {
   copying.value = true
   try {
-    let orders = await collectLinkedOrders(true)
-    const need = orders.filter((o) => canDecryptOrder(o) && isMaskedReceiver(o))
-    if (need.length) {
-      const data = await supplyApi.decryptOrders(need.map((o) => o.id))
-      const byId = new Map((data.items || []).map((o) => [o.id, o]))
-      orders = orders.map((o) => byId.get(o.id) || o)
-    }
+    const orders = await collectLinkedOrders(true)
     let trackingBySoId: Record<number, string> = {}
     try {
       const ships = shipments.value.length

@@ -119,7 +119,6 @@ import {
   buildTrackingBySoId,
   canDecryptOrder,
   collectActiveRefSoIds,
-  isMaskedReceiver,
 } from '../../utils/supplyOrderCopy'
 import { copyTextForUser } from '../../utils/copyFallback'
 import { daysAgo, toApiDateTimeRange, todayDay } from '../../utils/dateRange'
@@ -281,13 +280,7 @@ async function decryptRow(row: PurchaseOrderListItem) {
 async function copyRow(row: PurchaseOrderListItem) {
   try {
     const loaded = await loadLinkedOrders(row.id, true)
-    let orders = loaded.orders
-    const need = orders.filter((o) => canDecryptOrder(o) && isMaskedReceiver(o))
-    if (need.length) {
-      const data = await supplyApi.decryptOrders(need.map((o) => o.id))
-      const byId = new Map((data.items || []).map((o) => [o.id, o]))
-      orders = orders.map((o) => byId.get(o.id) || o)
-    }
+    const orders = loaded.orders
     let trackingBySoId: Record<number, string> = {}
     try {
       const ships = await supplyApi.listShipments(row.id)

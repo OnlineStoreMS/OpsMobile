@@ -101,6 +101,7 @@ export interface SupplyOrderBrief {
   buyerPhone?: string
   status?: string
   shipStatus?: string
+  sellerRemark?: string
   address?: {
     name?: string
     phone?: string
