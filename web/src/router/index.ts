@@ -387,6 +387,32 @@ const router = createRouter({
       meta: { title: 'DeepSeek 设置', hideTabbar: true },
     },
 
+    // —— Agents 中心子页 ——
+    {
+      path: '/agents/keepalive',
+      name: 'AgentsKeepAlive',
+      component: () => import('../views/agents/ShopKeepAlive.vue'),
+      meta: { title: '店铺保活', hideTabbar: true },
+    },
+    {
+      path: '/agents/nodes',
+      name: 'AgentsNodes',
+      component: () => import('../views/agents/AgentList.vue'),
+      meta: { title: '执行节点', hideTabbar: true },
+    },
+    {
+      path: '/agents/shops',
+      name: 'AgentsShops',
+      component: () => import('../views/agents/ShopList.vue'),
+      meta: { title: '店铺会话', hideTabbar: true },
+    },
+    {
+      path: '/agents/jobs',
+      name: 'AgentsJobs',
+      component: () => import('../views/agents/JobList.vue'),
+      meta: { title: '任务', hideTabbar: true },
+    },
+
     // —— 电商店铺同步子页 ——
     {
       path: '/storesync/products',

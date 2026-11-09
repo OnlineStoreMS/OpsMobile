@@ -9,6 +9,7 @@ import StoreSyncHome from './views/storesync/StoreSyncHome.vue'
 import StoreHome from './views/store/StoreHome.vue'
 import AfterSalesHome from './views/aftersales/AfterSalesHome.vue'
 import CsHome from './views/cs/CsHome.vue'
+import AgentsHome from './views/agents/AgentsHome.vue'
 
 /**
  * OpsMobile 顶层大页（安卓 ViewPager）。
@@ -60,6 +61,13 @@ export const hubPages: HubPageDef[] = [
     title: '客服中心',
     short: '客服',
     component: CsHome,
+  },
+  {
+    path: '/agents',
+    name: 'AgentsHome',
+    title: 'Agents 中心',
+    short: 'Agents',
+    component: AgentsHome,
   },
   {
     path: '/supply',
